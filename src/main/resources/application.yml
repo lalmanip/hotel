@@ -1,0 +1,123 @@
+server:
+  port: 8090
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: hotel-booking-platform
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/hotel_booking?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: 
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        use_sql_comments: true
+    open-in-view: false
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ""          # set if Redis has auth
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000  # 10 minutes in ms
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+# ─── JWT ─────────────────────────────────────────────────────────────────────
+jwt:
+  secret: 5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437   # 256-bit hex key
+  expiration-ms: 86400000   # 24 hours
+
+# ─── Aggregator Configuration ─────────────────────────────────────────────────
+hotel:
+  aggregators:
+    active: TBO             # comma-separated for multi: TBO,EXPEDIA
+    tbo:
+      base-url: https://HotelBE.tektravels.com/hotelservice.svc/rest
+      internal-base-url: https://HotelBE.tektravels.com/internalhotelservice.svc/rest
+      timeout-seconds: 15
+      # Endpoint paths (defaults match TBO docs; override here if they change)
+      search-path: /Gethotelresult
+      hotel-info-path: /GetHotelInfo
+      get-room-path: /GetHotelRoom
+      block-path: /blockRoom
+      book-path: /book
+      booking-detail-path: /GetBookingDetail
+      # Authentication (same credentials as TBO Flight microservice)
+      auth-url: https://api.tektravels.com/SharedServices/SharedData.svc/rest/Authenticate
+      client-id: ApiIntegrationNew
+      user-name: Abhimanyu
+      password: Abhimanyu@123
+      end-user-ip: 192.168.11.120
+
+# ─── Resilience4j ─────────────────────────────────────────────────────────────
+resilience4j:
+  circuitbreaker:
+    instances:
+      aggregator:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+  retry:
+    instances:
+      aggregator:
+        maxAttempts: 3
+        waitDuration: 500ms
+        retryExceptions:
+          - org.springframework.web.reactive.function.client.WebClientRequestException
+          - java.util.concurrent.TimeoutException
+  timelimiter:
+    instances:
+      aggregator:
+        timeoutDuration: 15s
+
+# ─── SpringDoc / Swagger ──────────────────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+
+# ─── Logging ──────────────────────────────────────────────────────────────────
+logging:
+  level:
+    root: INFO
+    com.vivance.hotel: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
