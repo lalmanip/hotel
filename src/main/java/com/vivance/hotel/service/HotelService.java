@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -47,7 +48,7 @@ public class HotelService {
             log.info("Cache miss — fetching hotels for city={}", request.getCity());
 
             // 2. Query aggregators (main data source in aggregator-driven model)
-            List<HotelDto> results = aggregatorManagerService.searchHotels(request);
+            List<HotelDto> results = new ArrayList<>(aggregatorManagerService.searchHotels(request));
 
             // 3. Supplement with local DB hotels not covered by aggregators
             List<Hotel> localHotels = hotelRepository.findByCityIgnoreCase(request.getCity());

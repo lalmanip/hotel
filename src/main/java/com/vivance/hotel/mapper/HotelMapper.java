@@ -26,6 +26,8 @@ public interface HotelMapper {
     @Mapping(target = "currency", ignore = true)
     @Mapping(target = "aggregatorSource", ignore = true)
     @Mapping(target = "externalHotelId", ignore = true)
+    @Mapping(target = "resultIndex", ignore = true)
+    @Mapping(target = "traceId", ignore = true)
     HotelDto toHotelDto(Hotel hotel);
 
     @Mapping(target = "amenities", source = "amenities", qualifiedByName = "splitCsv")
@@ -36,6 +38,16 @@ public interface HotelMapper {
     @Mapping(target = "amenities", source = "amenities", qualifiedByName = "splitCsv")
     @Mapping(target = "imageUrls", source = "imageUrls", qualifiedByName = "splitCsv")
     @Mapping(target = "totalPrice", ignore = true)
+    @Mapping(target = "roomIndex", ignore = true)
+    @Mapping(target = "roomTypeCode", ignore = true)
+    @Mapping(target = "roomTypeName", ignore = true)
+    @Mapping(target = "ratePlanCode", ignore = true)
+    @Mapping(target = "availabilityType", ignore = true)
+    @Mapping(target = "cancellationPolicy", ignore = true)
+    @Mapping(target = "lastCancellationDate", ignore = true)
+    @Mapping(target = "isPANMandatory", ignore = true)
+    @Mapping(target = "isPassportMandatory", ignore = true)
+    @Mapping(target = "roomPromotion", ignore = true)
     RoomAvailabilityDto toRoomAvailabilityDto(Room room);
 
     List<HotelDto> toHotelDtoList(List<Hotel> hotels);

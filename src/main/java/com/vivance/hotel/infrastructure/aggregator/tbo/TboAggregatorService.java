@@ -7,6 +7,7 @@ import com.vivance.hotel.dto.response.BookingDto;
 import com.vivance.hotel.dto.response.HotelDetailDto;
 import com.vivance.hotel.dto.response.HotelDto;
 import com.vivance.hotel.dto.response.RoomAvailabilityDto;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vivance.hotel.exception.AggregatorException;
 import com.vivance.hotel.infrastructure.aggregator.HotelAggregatorService;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.*;
@@ -46,6 +47,7 @@ public class TboAggregatorService implements HotelAggregatorService {
     private final TboAuthService tboAuthService;
     private final TboApiLogger tboApiLogger;
     private final AggregatorProperties aggregatorProperties;
+    private final ObjectMapper objectMapper;
 
     @Override
     public AggregatorType getAggregatorType() {
@@ -83,19 +85,16 @@ public class TboAggregatorService implements HotelAggregatorService {
                 .tokenId(token)
                 .build();
 
+        String searchUrl = cfg.getBaseUrl() + cfg.getSearchPath();
         log.info("[TBO] Searching hotels: city={}, checkIn={}, nights={}, guests={}",
                 request.getCityId(), request.getCheckIn(), nights, request.getGuests());
-        tboApiLogger.logRequest("TboHotelSearch", token, tboReq);
+        tboApiLogger.logRequest("TboHotelSearch", searchUrl, token, tboReq);
 
-        TboHotelSearchResponse response = post(
-                cfg.getBaseUrl() + cfg.getSearchPath(),
-                tboReq,
-                TboHotelSearchResponse.class
-        );
-        tboApiLogger.logResponse("TboHotelSearch", token, response);
+        TboHotelSearchResponse response = post(searchUrl, tboReq, TboHotelSearchResponse.class);
+        tboApiLogger.logResponse("TboHotelSearch", searchUrl, token, response);
 
         TboHotelSearchResponse.HotelSearchResult result = response.getHotelSearchResult();
-        validateStatus(result.getResponseStatus(), result.getError(), "TboHotelSearch");
+        validateStatus(result.getResponseStatus(), result.getError(), "TboHotelSearch", searchUrl);
 
         String traceId = result.getTraceId();
         log.info("[TBO] Search returned {} hotels, traceId={}",
@@ -123,18 +122,15 @@ public class TboAggregatorService implements HotelAggregatorService {
                 .traceId(traceId)
                 .build();
 
+        String infoUrl = cfg.getBaseUrl() + cfg.getHotelInfoPath();
         log.info("[TBO] GetHotelInfo: hotelCode={}, resultIndex={}", externalHotelId, resultIndex);
-        tboApiLogger.logRequest("TboGetHotelInfo", token, tboReq);
+        tboApiLogger.logRequest("TboGetHotelInfo", infoUrl, token, tboReq);
 
-        TboHotelInfoResponse response = post(
-                cfg.getBaseUrl() + cfg.getHotelInfoPath(),
-                tboReq,
-                TboHotelInfoResponse.class
-        );
-        tboApiLogger.logResponse("TboGetHotelInfo", token, response);
+        TboHotelInfoResponse response = post(infoUrl, tboReq, TboHotelInfoResponse.class);
+        tboApiLogger.logResponse("TboGetHotelInfo", infoUrl, token, response);
 
         TboHotelInfoResponse.HotelInfoResult result = response.getHotelInfoResult();
-        validateStatus(result.getResponseStatus(), result.getError(), "TboGetHotelInfo");
+        validateStatus(result.getResponseStatus(), result.getError(), "TboGetHotelInfo", infoUrl);
 
         return mapToHotelDetailDto(result.getHotelDetails());
     }
@@ -160,19 +156,16 @@ public class TboAggregatorService implements HotelAggregatorService {
                 .traceId(traceId)
                 .build();
 
+        String roomUrl = cfg.getBaseUrl() + cfg.getGetRoomPath();
         log.info("[TBO] GetHotelRoom: hotelCode={}, resultIndex={}, traceId={}",
                 externalHotelId, resultIndex, traceId);
-        tboApiLogger.logRequest("TboGetHotelRoom", token, tboReq);
+        tboApiLogger.logRequest("TboGetHotelRoom", roomUrl, token, tboReq);
 
-        TboGetRoomResponse response = post(
-                cfg.getBaseUrl() + cfg.getGetRoomPath(),
-                tboReq,
-                TboGetRoomResponse.class
-        );
-        tboApiLogger.logResponse("TboGetHotelRoom", token, response);
+        TboGetRoomResponse response = post(roomUrl, tboReq, TboGetRoomResponse.class);
+        tboApiLogger.logResponse("TboGetHotelRoom", roomUrl, token, response);
 
         TboGetRoomResponse.GetHotelRoomResult result = response.getGetHotelRoomResult();
-        validateStatus(result.getResponseStatus(), result.getError(), "TboGetHotelRoom");
+        validateStatus(result.getResponseStatus(), result.getError(), "TboGetHotelRoom", roomUrl);
 
         return result.getHotelRoomsDetails().stream()
                 .map(r -> mapToRoomAvailabilityDto(r, nights))
@@ -223,18 +216,15 @@ public class TboAggregatorService implements HotelAggregatorService {
                 .traceId(traceId)
                 .build();
 
+        String blockUrl = cfg.getBaseUrl() + cfg.getBlockPath();
         log.info("[TBO] BlockRoom: hotelCode={}, resultIndex={}", externalHotelId, resultIndex);
-        tboApiLogger.logRequest("TboBlockRoom", token, blockReq);
+        tboApiLogger.logRequest("TboBlockRoom", blockUrl, token, blockReq);
 
-        TboBlockRoomResponse blockResp = post(
-                cfg.getBaseUrl() + cfg.getBlockPath(),
-                blockReq,
-                TboBlockRoomResponse.class
-        );
-        tboApiLogger.logResponse("TboBlockRoom", token, blockResp);
+        TboBlockRoomResponse blockResp = post(blockUrl, blockReq, TboBlockRoomResponse.class);
+        tboApiLogger.logResponse("TboBlockRoom", blockUrl, token, blockResp);
 
         TboBlockRoomResponse.BlockRoomResult blockResult = blockResp.getBlockRoomResult();
-        validateStatus(blockResult.getResponseStatus(), blockResult.getError(), "TboBlockRoom");
+        validateStatus(blockResult.getResponseStatus(), blockResult.getError(), "TboBlockRoom", blockUrl);
 
         if (blockResult.isPriceChanged()) {
             log.warn("[TBO] Price changed during block for hotelCode={}", externalHotelId);
@@ -279,18 +269,15 @@ public class TboAggregatorService implements HotelAggregatorService {
                 .traceId(traceId)
                 .build();
 
+        String bookUrl = cfg.getBaseUrl() + cfg.getBookPath();
         log.info("[TBO] BookHotel: hotelCode={}, resultIndex={}", externalHotelId, resultIndex);
-        tboApiLogger.logRequest("TboBook", token, bookReq);
+        tboApiLogger.logRequest("TboBook", bookUrl, token, bookReq);
 
-        TboBookResponse bookResp = post(
-                cfg.getBaseUrl() + cfg.getBookPath(),
-                bookReq,
-                TboBookResponse.class
-        );
-        tboApiLogger.logResponse("TboBook", token, bookResp);
+        TboBookResponse bookResp = post(bookUrl, bookReq, TboBookResponse.class);
+        tboApiLogger.logResponse("TboBook", bookUrl, token, bookResp);
 
         TboBookResponse.BookResult bookResult = bookResp.getBookResult();
-        validateStatus(bookResult.getResponseStatus(), bookResult.getError(), "TboBook");
+        validateStatus(bookResult.getResponseStatus(), bookResult.getError(), "TboBook", bookUrl);
 
         log.info("[TBO] Booking confirmed: status={}, confirmationNo={}, bookingRefNo={}",
                 bookResult.getHotelBookingStatus(), bookResult.getConfirmationNo(),
@@ -313,19 +300,16 @@ public class TboAggregatorService implements HotelAggregatorService {
                 .tokenId(token)
                 .build();
 
+        String detailUrl = cfg.getInternalBaseUrl() + cfg.getBookingDetailPath();
         log.info("[TBO] GetBookingDetail: bookingId={}", bookingId);
-        tboApiLogger.logRequest("TboGetBookingDetail", token, req);
+        tboApiLogger.logRequest("TboGetBookingDetail", detailUrl, token, req);
 
-        TboGetBookingDetailResponse response = post(
-                cfg.getInternalBaseUrl() + cfg.getBookingDetailPath(),
-                req,
-                TboGetBookingDetailResponse.class
-        );
-        tboApiLogger.logResponse("TboGetBookingDetail", token, response);
+        TboGetBookingDetailResponse response = post(detailUrl, req, TboGetBookingDetailResponse.class);
+        tboApiLogger.logResponse("TboGetBookingDetail", detailUrl, token, response);
 
         TboGetBookingDetailResponse.GetBookingDetailResult result =
                 response.getGetBookingDetailResult();
-        validateStatus(result.getResponseStatus(), result.getError(), "TboGetBookingDetail");
+        validateStatus(result.getResponseStatus(), result.getError(), "TboGetBookingDetail", detailUrl);
 
         return result;
     }
@@ -423,30 +407,60 @@ public class TboAggregatorService implements HotelAggregatorService {
 
     // ─── HTTP helpers ─────────────────────────────────────────────────────────
 
+    /**
+     * Posts to a TBO endpoint and parses the JSON response.
+     *
+     * Always reads the raw response body as a String first so we can log it and detect
+     * HTML error pages before Jackson attempts deserialization. This prevents the cryptic
+     * "no HttpMessageConverter for text/html" error and gives full visibility into what
+     * TBO actually returned.
+     */
     private <T> T post(String url, Object requestBody, Class<T> responseType) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        // Accept anything so RestTemplate never rejects TBO's content-type header
+        headers.setAccept(List.of(MediaType.ALL));
         HttpEntity<Object> entity = new HttpEntity<>(requestBody, headers);
 
-        ResponseEntity<T> response = tboRestTemplate.exchange(
-                url, HttpMethod.POST, entity, responseType);
+        ResponseEntity<String> raw = tboRestTemplate.exchange(
+                url, HttpMethod.POST, entity, String.class);
 
-        if (response.getBody() == null) {
+        String body = raw.getBody();
+        MediaType contentType = raw.getHeaders().getContentType();
+
+        if (body == null || body.isBlank()) {
             throw new AggregatorException("Empty response from TBO at: " + url);
         }
-        return response.getBody();
+
+        // TBO sometimes returns an HTML error page instead of JSON
+        if (contentType != null && contentType.isCompatibleWith(MediaType.TEXT_HTML)) {
+            String preview = body.length() > 3000 ? body.substring(0, 3000) + "\n... [TRUNCATED]" : body;
+            log.error("[TBO] Received HTML instead of JSON from {}.\nContent-Type: {}\nBody:\n{}",
+                    url, contentType, preview);
+            throw new AggregatorException(
+                    "TBO returned an HTML error page instead of JSON from: " + url +
+                    ". Check logs for the HTML content — the token may be invalid or the endpoint path may have changed.");
+        }
+
+        try {
+            return objectMapper.readValue(body, responseType);
+        } catch (Exception e) {
+            String preview = body.length() > 800 ? body.substring(0, 800) + "..." : body;
+            log.error("[TBO] Failed to parse JSON from {}.\nBody:\n{}", url, preview);
+            throw new AggregatorException("Failed to parse TBO response from " + url + ": " + e.getMessage());
+        }
     }
 
-    private void validateStatus(int responseStatus, TboError error, String operation) {
+    private void validateStatus(int responseStatus, TboError error, String operation, String url) {
         if (responseStatus != 1) {
             String msg = error != null && error.getErrorMessage() != null
                     ? error.getErrorMessage()
                     : "Unknown error (code " + (error != null ? error.getErrorCode() : "?") + ")";
-            tboApiLogger.logError(operation, null, msg);
+            tboApiLogger.logError(operation, url, null, msg);
             throw new AggregatorException("[TBO] " + operation + " failed: " + msg);
         }
         if (error != null && error.hasError()) {
-            tboApiLogger.logError(operation, null, error.getErrorMessage());
+            tboApiLogger.logError(operation, url, null, error.getErrorMessage());
             throw new AggregatorException("[TBO] " + operation + " error: " + error.getErrorMessage());
         }
     }

@@ -78,7 +78,7 @@ public class TboAuthService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<TboAuthRequest> entity = new HttpEntity<>(authRequest, headers);
 
-        tboApiLogger.logRequest("TboAuthenticate", null, authRequest);
+        tboApiLogger.logRequest("TboAuthenticate", cfg.getAuthUrl(), null, authRequest);
 
         try {
             ResponseEntity<TboAuthResponse> response = tboRestTemplate.exchange(
@@ -89,7 +89,7 @@ public class TboAuthService {
             );
 
             TboAuthResponse body = response.getBody();
-            tboApiLogger.logResponse("TboAuthenticate", null, body);
+            tboApiLogger.logResponse("TboAuthenticate", cfg.getAuthUrl(), null, body);
 
             if (body != null && body.isSuccess()) {
                 TboAuthToken saved = tokenRepository.save(
@@ -107,7 +107,7 @@ public class TboAuthService {
                     ? body.getError().getErrorMessage()
                     : "Unknown authentication error";
 
-            tboApiLogger.logError("TboAuthenticate", null, errorMsg);
+            tboApiLogger.logError("TboAuthenticate", cfg.getAuthUrl(), null, errorMsg);
             throw new RuntimeException("TBO authentication failed: " + errorMsg);
 
         } catch (RuntimeException e) {

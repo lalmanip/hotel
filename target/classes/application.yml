@@ -67,18 +67,18 @@ hotel:
       internal-base-url: https://HotelBE.tektravels.com/internalhotelservice.svc/rest
       timeout-seconds: 15
       # Endpoint paths (defaults match TBO docs; override here if they change)
-      search-path: /Gethotelresult
-      hotel-info-path: /GetHotelInfo
-      get-room-path: /GetHotelRoom
-      block-path: /blockRoom
-      book-path: /book
-      booking-detail-path: /GetBookingDetail
+      search-path: /Gethotelresult/
+      hotel-info-path: /GetHotelInfo/
+      get-room-path: /GetHotelRoom/
+      block-path: /blockRoom/
+      book-path: /book/
+      booking-detail-path: /GetBookingDetail/
       # Authentication (same credentials as TBO Flight microservice)
       auth-url: https://api.tektravels.com/SharedServices/SharedData.svc/rest/Authenticate
       client-id: ApiIntegrationNew
       user-name: Abhimanyu
       password: Abhimanyu@123
-      end-user-ip: 192.168.11.120
+      end-user-ip: 123.1.1.1
 
 # ─── Resilience4j ─────────────────────────────────────────────────────────────
 resilience4j:

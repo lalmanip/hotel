@@ -46,6 +46,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/hotels/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/hotels/search").permitAll()
                         .requestMatchers("/api/v1/bookings/**").hasAnyRole("USER", "ADMIN")
                         .anyRequest().authenticated()
                 )
