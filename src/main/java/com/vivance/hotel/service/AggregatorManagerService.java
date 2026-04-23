@@ -13,6 +13,8 @@ import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliatePreBookRe
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateBookRequest;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboBookResponse;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateSearchResponse;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboGetBookingDetailRequest;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboGetBookingDetailResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -93,6 +95,14 @@ public class AggregatorManagerService {
             return tbo.bookRaw(request);
         }
         throw new IllegalStateException("TBO aggregator implementation does not support raw book.");
+    }
+
+    public TboGetBookingDetailResponse getBookingDetailRawTbo(TboGetBookingDetailRequest request) {
+        var agg = aggregatorFactory.getAggregator(AggregatorType.TBO);
+        if (agg instanceof TboAggregatorService tbo) {
+            return tbo.getBookingDetailRaw(request);
+        }
+        throw new IllegalStateException("TBO aggregator implementation does not support GetBookingDetail.");
     }
 
     /**

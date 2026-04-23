@@ -52,6 +52,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/hotels/search").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/hotels/prebook").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/hotels/book").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/hotels/getbookingdetails").authenticated()
                         .requestMatchers("/api/v1/admin/tbo/static/**").permitAll()
                         .requestMatchers("/api/v1/bookings/**").hasAnyRole("USER", "ADMIN")
                         .anyRequest().authenticated()

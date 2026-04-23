@@ -12,6 +12,8 @@ import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliatePreBookRe
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateBookRequest;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateSearchResponse;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboBookResponse;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboGetBookingDetailRequest;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboGetBookingDetailResponse;
 import com.vivance.hotel.service.HotelService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -115,6 +117,20 @@ public class HotelController {
                 .build();
 
         TboBookResponse resp = hotelService.bookRawTbo(tboReq);
+        return ResponseEntity.ok(ApiResponse.success(resp));
+    }
+
+    /**
+     * POST /api/v1/hotels/getbookingdetails
+     *
+     * Frontend passthrough for TBO HotelBE Getbookingdetail.
+     * Requires {@code X-API-KEY} and {@code Authorization: Bearer <refreshToken>} (validated by {@link com.vivance.hotel.security.ApiKeyBearerAuthFilter}).
+     */
+    @PostMapping("/getbookingdetails")
+    @Operation(summary = "Get booking details (TBO HotelBE)", description = "Calls TBO Getbookingdetail and returns supplier response.")
+    public ResponseEntity<ApiResponse<TboGetBookingDetailResponse>> getBookingDetails(
+            @Valid @RequestBody TboGetBookingDetailRequest request) {
+        TboGetBookingDetailResponse resp = hotelService.getBookingDetailRawTbo(request);
         return ResponseEntity.ok(ApiResponse.success(resp));
     }
 

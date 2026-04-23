@@ -11,6 +11,8 @@ import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliatePreBookRe
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateBookRequest;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboBookResponse;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateSearchResponse;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboGetBookingDetailRequest;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboGetBookingDetailResponse;
 import com.vivance.hotel.exception.HotelNotFoundException;
 import com.vivance.hotel.mapper.HotelMapper;
 import com.vivance.hotel.repository.AggregatorMappingRepository;
@@ -87,6 +89,11 @@ public class HotelService {
     @Transactional(readOnly = true)
     public TboBookResponse bookRawTbo(TboAffiliateBookRequest request) {
         return aggregatorManagerService.bookRawTbo(request);
+    }
+
+    @Transactional(readOnly = true)
+    public TboGetBookingDetailResponse getBookingDetailRawTbo(TboGetBookingDetailRequest request) {
+        return aggregatorManagerService.getBookingDetailRawTbo(request);
     }
 
     /**

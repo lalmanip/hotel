@@ -458,7 +458,8 @@ public class TboAggregatorService implements HotelAggregatorService {
 
         String detailUrl = cfg.getBaseUrl() + cfg.getBookingDetailPath();
         log.info("[TBO] GetBookingDetail: bookingId={}, traceId={}", bookingId, traceId);
-        TboGetBookingDetailResponse response = post(
+        // HotelBE endpoints require Basic Auth (same credentials as PreBook/Book).
+        TboGetBookingDetailResponse response = postAffiliate(
                 "TboGetBookingDetail",
                 detailUrl,
                 token,
@@ -471,6 +472,52 @@ public class TboAggregatorService implements HotelAggregatorService {
         validateStatus(result.getResponseStatus(), result.getError(), "TboGetBookingDetail", detailUrl);
 
         return result;
+    }
+
+    /**
+     * Frontend passthrough: validates BookingId/TraceId presence and calls TBO HotelBE
+     * Getbookingdetail using the incoming payload (EndUserIp, TokenId, BookingId/TraceId).
+     * Adds HTTP Basic Auth (same as PreBook/Book).
+     */
+    @CircuitBreaker(name = "aggregator", fallbackMethod = "getBookingDetailRawFallback")
+    @Retry(name = "aggregator")
+    public TboGetBookingDetailResponse getBookingDetailRaw(TboGetBookingDetailRequest request) {
+        if (request == null) {
+            throw new AggregatorException("Request body is required for TBO GetBookingDetail.");
+        }
+        boolean hasBookingId = request.getBookingId() != null && !request.getBookingId().isBlank();
+        boolean hasTraceId = request.getTraceId() != null && !request.getTraceId().isBlank();
+        if (!hasBookingId && !hasTraceId) {
+            throw new AggregatorException("Provide either BookingId or TraceId for TBO GetBookingDetail.");
+        }
+        if (request.getTokenId() == null || request.getTokenId().isBlank()) {
+            throw new AggregatorException("TokenId is required for TBO GetBookingDetail.");
+        }
+        if (request.getEndUserIp() == null || request.getEndUserIp().isBlank()) {
+            throw new AggregatorException("EndUserIp is required for TBO GetBookingDetail.");
+        }
+
+        AggregatorProperties.TboConfig cfg = aggregatorProperties.getTbo();
+        String detailUrl = cfg.getBaseUrl() + cfg.getBookingDetailPath();
+        log.info("[TBO] GetBookingDetail (client): bookingId={}, traceId={}",
+                request.getBookingId(), request.getTraceId());
+
+        TboGetBookingDetailResponse response = postAffiliate(
+                "TboGetBookingDetailClient",
+                detailUrl,
+                request.getTokenId(),
+                request,
+                TboGetBookingDetailResponse.class
+        );
+
+        TboGetBookingDetailResponse.GetBookingDetailResult result = response.getGetBookingDetailResult();
+        validateStatus(result.getResponseStatus(), result.getError(), "TboGetBookingDetailClient", detailUrl);
+        return response;
+    }
+
+    public TboGetBookingDetailResponse getBookingDetailRawFallback(TboGetBookingDetailRequest request, Throwable t) {
+        log.error("[TBO] Circuit breaker — getBookingDetailRaw: {}", t.getMessage());
+        throw new AggregatorException("TBO GetBookingDetail service is currently unavailable. Please try again later.");
     }
 
     // ─── Console logging helpers ──────────────────────────────────────────────

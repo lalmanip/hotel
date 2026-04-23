@@ -44,7 +44,8 @@ public class ApiKeyBearerAuthFilter extends OncePerRequestFilter {
         // Protect hotel search + affiliate flow endpoints only
         return !(uri.equals("/api/v1/hotels/search")
                 || uri.equals("/api/v1/hotels/prebook")
-                || uri.equals("/api/v1/hotels/book"));
+                || uri.equals("/api/v1/hotels/book")
+                || uri.equals("/api/v1/hotels/getbookingdetails"));
     }
 
     @Override
