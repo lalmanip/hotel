@@ -1,6 +1,7 @@
 package com.vivance.hotel.config;
 
 import com.vivance.hotel.security.JwtAuthenticationFilter;
+import com.vivance.hotel.security.ApiKeyBearerAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,6 +28,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final ApiKeyBearerAuthFilter apiKeyBearerAuthFilter;
     private final UserDetailsService userDetailsService;
 
     /** Public endpoints that don't require authentication. */
@@ -46,11 +48,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/hotels/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/hotels/search").permitAll()
+                        // Frontend hotel flow must be protected like vivance_api (X-API-KEY + Bearer refreshToken)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/hotels/search").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/hotels/prebook").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/hotels/book").authenticated()
+                        .requestMatchers("/api/v1/admin/tbo/static/**").permitAll()
                         .requestMatchers("/api/v1/bookings/**").hasAnyRole("USER", "ADMIN")
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
+                .addFilterBefore(apiKeyBearerAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

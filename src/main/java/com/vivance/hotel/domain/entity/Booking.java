@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(
-    name = "bookings",
+    name = "hotel_bookings",
     indexes = {
         @Index(name = "idx_booking_user", columnList = "user_id"),
         @Index(name = "idx_booking_status", columnList = "status"),
@@ -36,7 +36,12 @@ public class Booking {
     private String bookingReference;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(
+            name = "user_id",
+            nullable = false,
+            // Must match `user.user_id` (INT); BIGINT causes MySQL error 3780 on FK creation.
+            columnDefinition = "INT"
+    )
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -77,7 +82,8 @@ public class Booking {
     private String aggregatorBookingId;
 
     /** Reason if booking failed */
-    @Column(columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "failure_reason")
     private String failureReason;
 
     @Column(length = 200)

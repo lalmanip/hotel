@@ -40,7 +40,8 @@ public class Hotel {
     @Column(length = 500)
     private String address;
 
-    @Column(columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "description")
     private String description;
 
     /** Star rating: 1–5 */
@@ -48,11 +49,13 @@ public class Hotel {
     private Integer starRating;
 
     /** Comma-separated amenity list stored for quick display */
-    @Column(columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "amenities")
     private String amenities;
 
     /** Comma-separated image URLs */
-    @Column(columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "image_urls")
     private String imageUrls;
 
     @Column(length = 100)

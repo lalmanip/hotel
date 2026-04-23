@@ -8,7 +8,7 @@ spring:
     name: hotel-booking-platform
 
   datasource:
-    url: jdbc:mysql://localhost:3306/hotel_booking?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/vivance_java?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
     password: 
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -19,39 +19,33 @@ spring:
       idle-timeout: 600000
       max-lifetime: 1800000
 
+  flyway:
+    # Schema is maintained manually (or run SQL from db/migration yourself). No automatic migrations.
+    enabled: false
+    table: hotel_flyway_schema_history
+    baseline-on-migrate: false
+
   jpa:
     hibernate:
-      ddl-auto: update
+      # No Hibernate DDL: create/alter/drop tables only via your own SQL / DBA process.
+      ddl-auto: none
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
-        format_sql: true
-        use_sql_comments: true
+        format_sql: false
+        use_sql_comments: false
+        # Required so the physical table name `user` is quoted in SQL (MySQL reserved word).
+        globally_quoted_identifiers: true
     open-in-view: false
-
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      password: ""          # set if Redis has auth
-      timeout: 5000ms
-      lettuce:
-        pool:
-          max-active: 16
-          max-idle: 8
-          min-idle: 2
-
-  cache:
-    type: redis
-    redis:
-      time-to-live: 600000  # 10 minutes in ms
 
   jackson:
     serialization:
       write-dates-as-timestamps: false
     deserialization:
       fail-on-unknown-properties: false
+    mapper:
+      accept-case-insensitive-properties: true
 
 # ─── JWT ─────────────────────────────────────────────────────────────────────
 jwt:
@@ -64,21 +58,18 @@ hotel:
     active: TBO             # comma-separated for multi: TBO,EXPEDIA
     tbo:
       base-url: https://HotelBE.tektravels.com/hotelservice.svc/rest
-      internal-base-url: https://HotelBE.tektravels.com/internalhotelservice.svc/rest
       timeout-seconds: 15
-      # Endpoint paths (defaults match TBO docs; override here if they change)
-      search-path: /Gethotelresult/
-      hotel-info-path: /GetHotelInfo/
-      get-room-path: /GetHotelRoom/
-      block-path: /blockRoom/
+      # Endpoint paths (override if TBO changes them)
       book-path: /book/
-      booking-detail-path: /GetBookingDetail/
+      booking-detail-path: /Getbookingdetail/
       # Authentication (same credentials as TBO Flight microservice)
-      auth-url: https://api.tektravels.com/SharedServices/SharedData.svc/rest/Authenticate
+      auth-url: http://Sharedapi.tektravels.com/SharedData.svc/rest/Authenticate
       client-id: ApiIntegrationNew
       user-name: Abhimanyu
       password: Abhimanyu@123
       end-user-ip: 123.1.1.1
+      affiliate-search-url: https://affiliate.tektravels.com/HotelAPI/Search
+      affiliate-pre-book-url: https://affiliate.tektravels.com/HotelAPI/PreBook
 
 # ─── Resilience4j ─────────────────────────────────────────────────────────────
 resilience4j:

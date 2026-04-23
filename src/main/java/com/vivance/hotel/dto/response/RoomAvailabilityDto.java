@@ -8,11 +8,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Room availability DTO returned from GetHotelRoom.
+ * Room availability DTO (TBO affiliate Search / PreBook).
  *
- * <p><b>TBO booking fields:</b> {@code roomIndex}, {@code roomTypeCode}, {@code roomTypeName},
- * {@code ratePlanCode}, and {@code price} must be echoed verbatim into the Block and Book
- * request bodies. Clients must preserve these values from this response.
+ * <p><b>TBO affiliate:</b> {@code roomIndex} holds the supplier {@code BookingCode} for
+ * PreBook and Book. Preserve it for the booking flow.
  */
 @Data
 @Builder
@@ -31,8 +30,8 @@ public class RoomAvailabilityDto {
 
     // ── TBO session fields — must be sent back in Block / Book ────────────
 
-    /** TBO RoomIndex — identifies this specific room option within the search result. */
-    private Integer roomIndex;
+    /** TBO room identifier (legacy RoomIndex or affiliate BookingCode). */
+    private String roomIndex;
 
     /** TBO RoomTypeCode — e.g. "215713793|258053627$37321". */
     private String roomTypeCode;
@@ -60,4 +59,7 @@ public class RoomAvailabilityDto {
 
     /** Room promotions e.g. "Save:10%". */
     private String roomPromotion;
+
+    /** TBO affiliate {@code RoomID} values when returned by Search / PreBook. */
+    private List<String> tboRoomIds;
 }

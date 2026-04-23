@@ -10,7 +10,7 @@ import lombok.*;
  */
 @Entity
 @Table(
-    name = "aggregator_mappings",
+    name = "hotel_aggregator_mappings",
     uniqueConstraints = {
         @UniqueConstraint(
             name = "uq_aggregator_hotel",
@@ -34,7 +34,11 @@ public class AggregatorMapping {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "hotel_id", nullable = false)
+    @JoinColumn(
+            name = "hotel_id",
+            nullable = false,
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT)
+    )
     private Hotel hotel;
 
     @Enumerated(EnumType.STRING)
@@ -46,6 +50,7 @@ public class AggregatorMapping {
     private String externalHotelId;
 
     /** Additional metadata from aggregator (JSON or key=value) */
-    @Column(columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "metadata")
     private String metadata;
 }

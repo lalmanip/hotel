@@ -2,10 +2,16 @@ package com.vivance.hotel.controller;
 
 import com.vivance.hotel.domain.enums.AggregatorType;
 import com.vivance.hotel.dto.request.HotelSearchRequest;
+import com.vivance.hotel.dto.request.HotelPreBookRequest;
+import com.vivance.hotel.dto.request.HotelBookRequest;
 import com.vivance.hotel.dto.response.ApiResponse;
 import com.vivance.hotel.dto.response.HotelDetailDto;
 import com.vivance.hotel.dto.response.HotelDto;
 import com.vivance.hotel.dto.response.RoomAvailabilityDto;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliatePreBookResponse;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateBookRequest;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateSearchResponse;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboBookResponse;
 import com.vivance.hotel.service.HotelService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -43,15 +49,73 @@ public class HotelController {
     @Operation(summary = "Search hotels by city, dates, and guest count",
                description = "TBO: supply cityId (numeric TBO city code). Response includes " +
                              "traceId and resultIndex per hotel — required for all follow-up calls.")
-    public ResponseEntity<ApiResponse<List<HotelDto>>> searchHotels(
+    public ResponseEntity<ApiResponse<?>> searchHotels(
             @Valid @RequestBody HotelSearchRequest request) {
 
         log.debug("Hotel search: city={}, cityId={}, checkIn={}, checkOut={}, guests={}",
                 request.getCity(), request.getCityId(),
                 request.getCheckIn(), request.getCheckOut(), request.getGuests());
 
+        // If frontend is using TBO affiliate schema, return the raw TBO response.
+        // Auto-detect TBO affiliate search when HotelCodes/CityId are provided (even if Aggregator is omitted).
+        boolean isTboRawSearch =
+                (request.getAggregator() != null && "TBO".equalsIgnoreCase(request.getAggregator()))
+                        || ((request.getHotelCodes() != null && !request.getHotelCodes().isBlank())
+                        || (request.getCityId() != null && !request.getCityId().isBlank()));
+
+        if (isTboRawSearch) {
+            TboAffiliateSearchResponse raw = hotelService.searchHotelsRawTbo(request);
+            return ResponseEntity.ok(ApiResponse.success(raw));
+        }
+
         List<HotelDto> results = hotelService.searchHotels(request);
         return ResponseEntity.ok(ApiResponse.success("Found " + results.size() + " hotels", results));
+    }
+
+    /**
+     * POST /api/v1/hotels/prebook
+     *
+     * TBO Affiliate flow: PreBook locks price/validates booking before Book.
+     * Returns the raw TBO PreBook response to the frontend.
+     */
+    @PostMapping("/prebook")
+    @Operation(summary = "PreBook (TBO affiliate)", description = "Calls TBO affiliate PreBook and returns supplier response.")
+    public ResponseEntity<ApiResponse<TboAffiliatePreBookResponse>> preBook(
+            @Valid @RequestBody HotelPreBookRequest request) {
+
+        // Auto-detect TBO for now (this endpoint is only defined for TBO affiliate flow).
+        TboAffiliatePreBookResponse resp = hotelService.preBookRawTbo(
+                request.getBookingCode(),
+                request.getPaymentMode()
+        );
+        return ResponseEntity.ok(ApiResponse.success(resp));
+    }
+
+    /**
+     * POST /api/v1/hotels/book
+     *
+     * TBO Book (HotelBE): confirms booking after successful PreBook.
+     * Returns raw TBO BookResult to the frontend.
+     */
+    @PostMapping("/book")
+    @Operation(summary = "Book (TBO HotelBE)", description = "Calls TBO HotelBE Book and returns supplier response.")
+    public ResponseEntity<ApiResponse<TboBookResponse>> book(
+            @Valid @RequestBody HotelBookRequest request) {
+
+        // Map request -> TBO contract (same field names)
+        TboAffiliateBookRequest tboReq = TboAffiliateBookRequest.builder()
+                .bookingCode(request.getBookingCode())
+                .isVoucherBooking(request.getIsVoucherBooking())
+                .guestNationality(request.getGuestNationality())
+                .endUserIp(request.getEndUserIp())
+                .requestedBookingMode(request.getRequestedBookingMode())
+                .netAmount(request.getNetAmount())
+                .clientReferenceId(request.getClientReferenceId())
+                .hotelRoomsDetails(request.getHotelRoomsDetails())
+                .build();
+
+        TboBookResponse resp = hotelService.bookRawTbo(tboReq);
+        return ResponseEntity.ok(ApiResponse.success(resp));
     }
 
     /**

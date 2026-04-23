@@ -1,18 +1,22 @@
 package com.vivance.hotel.infrastructure.aggregator.tbo.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.List;
 
-/** Response from POST /internalhotelservice.svc/rest/GetBookingDetail */
+/** Response from POST {@code .../rest/Getbookingdetail} */
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TboGetBookingDetailResponse {
 
     @JsonProperty("GetBookingDetailResult")
     private GetBookingDetailResult getBookingDetailResult;
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class GetBookingDetailResult {
 
         @JsonProperty("VoucherStatus")
@@ -42,8 +46,10 @@ public class TboGetBookingDetailResponse {
         @JsonProperty("ConfirmationNo")
         private String confirmationNo;
 
-        @JsonProperty("BookingReferenceNo")
-        private String bookingReferenceNo;
+        /** TBO returns {@code BookingRefNo}; older docs used {@code BookingReferenceNo}. */
+        @JsonProperty("BookingRefNo")
+        @JsonAlias("BookingReferenceNo")
+        private String bookingRefNo;
 
         @JsonProperty("IsPriceChanged")
         private boolean isPriceChanged;

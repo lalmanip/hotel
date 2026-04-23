@@ -11,4 +11,6 @@ import java.util.Optional;
 public interface TboAuthTokenRepository extends JpaRepository<TboAuthToken, Long> {
 
     Optional<TboAuthToken> findByTokenDate(LocalDate tokenDate);
+
+    Optional<TboAuthToken> findByTokenId(String tokenId);
 }

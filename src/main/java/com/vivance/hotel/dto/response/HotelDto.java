@@ -38,16 +38,13 @@ public class HotelDto {
     /** The hotel's ID within the aggregator system (HotelCode in TBO). */
     private String externalHotelId;
 
-    /**
-     * TBO-specific: ResultIndex from search response.
-     * Required for GetHotelInfo, GetHotelRoom, Block, and Book calls.
-     */
+    /** TBO-specific: ResultIndex from legacy hotel search flow (not used in affiliate Search). */
     private Integer resultIndex;
 
     /**
      * TBO-specific: TraceId from the search response.
      * Ties all API calls in one search session together.
-     * Required for GetHotelInfo, GetHotelRoom, Block, and Book calls.
+     * Not used for the affiliate Search → PreBook → Book flow.
      */
     private String traceId;
 }

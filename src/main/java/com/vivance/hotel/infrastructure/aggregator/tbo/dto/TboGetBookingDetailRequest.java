@@ -6,8 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * Request body for POST /internalhotelservice.svc/rest/GetBookingDetail
- * Provide either BookingId OR TraceId (not both required).
+ * Request body for POST {@code .../rest/Getbookingdetail} on HotelBE.
+ * Provide either {@code BookingId} or {@code TraceId} (plus {@code TokenId} and {@code EndUserIp}).
  */
 @Data
 @Builder

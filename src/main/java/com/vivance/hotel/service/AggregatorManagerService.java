@@ -8,6 +8,11 @@ import com.vivance.hotel.dto.response.HotelDetailDto;
 import com.vivance.hotel.dto.response.HotelDto;
 import com.vivance.hotel.dto.response.RoomAvailabilityDto;
 import com.vivance.hotel.infrastructure.aggregator.AggregatorFactory;
+import com.vivance.hotel.infrastructure.aggregator.tbo.TboAggregatorService;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliatePreBookResponse;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateBookRequest;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboBookResponse;
+import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateSearchResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -54,6 +59,40 @@ public class AggregatorManagerService {
                 .map(CompletableFuture::join)
                 .flatMap(List::stream)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns the raw supplier response for a single aggregator.
+     *
+     * <p>Currently supported: TBO Affiliate Search response (passthrough).
+     */
+    public TboAffiliateSearchResponse searchHotelsRawTbo(HotelSearchRequest request) {
+        List<AggregatorType> types = resolveActiveAggregators(request.getAggregator());
+        if (types.size() != 1 || types.get(0) != AggregatorType.TBO) {
+            throw new IllegalArgumentException("Raw search is only supported for aggregator=TBO.");
+        }
+
+        var agg = aggregatorFactory.getAggregator(AggregatorType.TBO);
+        if (agg instanceof TboAggregatorService tbo) {
+            return tbo.searchHotelsRaw(request);
+        }
+        throw new IllegalStateException("TBO aggregator implementation does not support raw search.");
+    }
+
+    public TboAffiliatePreBookResponse preBookRawTbo(String bookingCode, String paymentMode) {
+        var agg = aggregatorFactory.getAggregator(AggregatorType.TBO);
+        if (agg instanceof TboAggregatorService tbo) {
+            return tbo.preBookRaw(bookingCode, paymentMode);
+        }
+        throw new IllegalStateException("TBO aggregator implementation does not support raw prebook.");
+    }
+
+    public TboBookResponse bookRawTbo(TboAffiliateBookRequest request) {
+        var agg = aggregatorFactory.getAggregator(AggregatorType.TBO);
+        if (agg instanceof TboAggregatorService tbo) {
+            return tbo.bookRaw(request);
+        }
+        throw new IllegalStateException("TBO aggregator implementation does not support raw book.");
     }
 
     /**

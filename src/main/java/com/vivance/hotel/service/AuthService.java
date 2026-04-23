@@ -1,7 +1,6 @@
 package com.vivance.hotel.service;
 
 import com.vivance.hotel.domain.entity.User;
-import com.vivance.hotel.domain.enums.UserRole;
 import com.vivance.hotel.dto.request.LoginRequest;
 import com.vivance.hotel.dto.request.RegisterRequest;
 import com.vivance.hotel.dto.response.AuthResponse;
@@ -17,10 +16,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    /** Written to {@code user.status} for new registrations — adjust if your schema uses another active value. */
+    private static final String DEFAULT_USER_STATUS = "ACTIVE";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -33,12 +37,16 @@ public class AuthService {
             throw new IllegalArgumentException("Email is already registered: " + request.getEmail());
         }
 
+        String[] nameParts = splitFullName(request.getFullName());
+        LocalDateTime now = LocalDateTime.now();
         User user = User.builder()
-                .fullName(request.getFullName())
+                .firstName(nameParts[0])
+                .lastName(nameParts[1])
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(UserRole.USER)
-                .enabled(true)
+                .status(DEFAULT_USER_STATUS)
+                .createdOn(now)
+                .modifiedOn(now)
                 .build();
 
         user = userRepository.save(user);
@@ -67,10 +75,23 @@ public class AuthService {
                 .accessToken(token)
                 .tokenType("Bearer")
                 .expiresIn(jwtTokenProvider.getExpirationMs() / 1000)
-                .userId(user.getId())
+                .userId(user.getId().longValue())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .role(user.getRole().name())
                 .build();
+    }
+
+    /** Splits "First Last" → [first, last]. Single token → [token, "."]. */
+    private static String[] splitFullName(String fullName) {
+        if (fullName == null || fullName.isBlank()) {
+            return new String[]{"Guest", "."};
+        }
+        String trimmed = fullName.trim();
+        int space = trimmed.lastIndexOf(' ');
+        if (space < 0) {
+            return new String[]{trimmed, "."};
+        }
+        return new String[]{trimmed.substring(0, space).trim(), trimmed.substring(space + 1).trim()};
     }
 }

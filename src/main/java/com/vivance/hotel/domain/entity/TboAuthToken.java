@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(
-    name = "tbo_auth_tokens",
+    name = "tbo_auth_token",
     indexes = {
         @Index(name = "idx_tbo_token_date", columnList = "token_date", unique = true)
     }

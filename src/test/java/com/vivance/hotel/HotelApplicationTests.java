@@ -14,11 +14,9 @@ import org.springframework.test.context.TestPropertySource;
     "spring.datasource.username=sa",
     "spring.datasource.password=",
     "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
-    "spring.jpa.hibernate.ddl-auto=create-drop",
-    // ── Cache — disable Redis so no connection is attempted ─────────────
-    "spring.cache.type=none",
-    "spring.data.redis.host=localhost",
-    "spring.data.redis.port=6379",
+    "spring.jpa.hibernate.ddl-auto=none",
+    "spring.jpa.properties.hibernate.globally_quoted_identifiers=true",
+    "spring.flyway.enabled=false",
     // ── JWT ─────────────────────────────────────────────────────────────
     "jwt.secret=5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437",
     "jwt.expiration-ms=86400000",

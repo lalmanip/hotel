@@ -35,18 +35,12 @@ public class AggregatorProperties {
         // ── Base URLs ─────────────────────────────────────────────────────
         /** e.g. https://HotelBE.tektravels.com/hotelservice.svc/rest */
         private String baseUrl;
-        /** e.g. https://HotelBE.tektravels.com/internalhotelservice.svc/rest */
-        private String internalBaseUrl;
         private int timeoutSeconds = 10;
 
-        // ── Endpoint paths (relative to baseUrl unless noted) ─────────────
-        private String searchPath        = "/Gethotelresult";
-        private String hotelInfoPath     = "/GetHotelInfo";
-        private String getRoomPath       = "/GetHotelRoom";
-        private String blockPath         = "/blockRoom";
+        // ── Endpoint paths (relative to baseUrl) ──────────────────────────
         private String bookPath          = "/book";
-        /** Relative to internalBaseUrl */
-        private String bookingDetailPath = "/GetBookingDetail";
+        /** Relative to {@link #baseUrl} (same host as Book), e.g. /Getbookingdetail */
+        private String bookingDetailPath = "/Getbookingdetail";
 
         // ── Authentication ────────────────────────────────────────────────
         private String authUrl;
@@ -55,5 +49,14 @@ public class AggregatorProperties {
         private String password;
         /** Your server's outbound IP, sent to TBO as EndUserIp */
         private String endUserIp;
+
+        // ── Static data API (basic auth) ──────────────────────────────────
+        private String staticBaseUrl = "http://api.tbotechnology.in/TBOHolidays_HotelAPI";
+        private String staticUserName = "TBOStaticAPITest";
+        private String staticPassword = "Tbo@11530818";
+
+        // ── Affiliate hotel flow URLs (Search -> PreBook) ───────────────────
+        private String affiliateSearchUrl = "https://affiliate.tektravels.com/HotelAPI/Search";
+        private String affiliatePreBookUrl = "https://affiliate.tektravels.com/HotelAPI/PreBook";
     }
 }

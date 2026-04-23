@@ -12,7 +12,7 @@ import java.util.List;
 
 @Entity
 @Table(
-    name = "rooms",
+    name = "hotel_rooms",
     indexes = {
         @Index(name = "idx_room_hotel", columnList = "hotel_id"),
         @Index(name = "idx_room_type", columnList = "room_type")
@@ -46,15 +46,18 @@ public class Room {
     @Builder.Default
     private String currency = "USD";
 
-    @Column(columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "description")
     private String description;
 
     /** Comma-separated amenity list */
-    @Column(columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "amenities")
     private String amenities;
 
     /** Comma-separated image URLs */
-    @Column(columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "image_urls")
     private String imageUrls;
 
     @Column(nullable = false)

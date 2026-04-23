@@ -35,7 +35,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = resolveToken(request);
 
-        if (StringUtils.hasText(token) && tokenProvider.validateToken(token)) {
+        // Frontend uses Bearer refresh tokens (non-JWT) for hotel flow.
+        // Only attempt JWT validation when the token looks like a JWT (has 2 dots).
+        if (StringUtils.hasText(token) && looksLikeJwt(token) && tokenProvider.validateToken(token)) {
             String username = tokenProvider.extractUsername(token);
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -51,6 +53,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private static boolean looksLikeJwt(String token) {
+        int dots = 0;
+        for (int i = 0; i < token.length(); i++) {
+            if (token.charAt(i) == '.') dots++;
+            if (dots > 2) return false;
+        }
+        return dots == 2;
     }
 
     /** Extracts the Bearer token from the Authorization header. */

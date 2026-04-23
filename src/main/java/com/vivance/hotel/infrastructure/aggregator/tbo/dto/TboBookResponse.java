@@ -13,6 +13,9 @@ public class TboBookResponse {
     @Data
     public static class BookResult {
 
+        @JsonProperty("TBOReferenceNo")
+        private String tboReferenceNo;
+
         @JsonProperty("VoucherStatus")
         private boolean voucherStatus;
 
@@ -35,6 +38,9 @@ public class TboBookResponse {
         /** "Confirmed", "BookFailed", "VerifyPrice", "Cancelled" */
         @JsonProperty("HotelBookingStatus")
         private String hotelBookingStatus;
+
+        @JsonProperty("InvoiceNumber")
+        private String invoiceNumber;
 
         @JsonProperty("ConfirmationNo")
         private String confirmationNo;
