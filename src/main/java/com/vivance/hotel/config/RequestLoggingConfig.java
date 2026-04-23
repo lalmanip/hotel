@@ -65,6 +65,7 @@ public class RequestLoggingConfig implements Filter {
     private static final String HOTEL_SEARCH_PATH = "/api/v1/hotels/search";
     private static final String HOTEL_PREBOOK_PATH = "/api/v1/hotels/prebook";
     private static final String HOTEL_BOOK_PATH = "/api/v1/hotels/book";
+    private static final String HOTEL_GETBOOKINGDETAILS_PATH = "/api/v1/hotels/getbookingdetails";
     private static final String CLIENT_REQ_EVENT_ID_ATTR = "CLIENT_VIVANCE_REQ_EVENT_ID";
 
     @Autowired
@@ -238,12 +239,16 @@ public class RequestLoggingConfig implements Filter {
     }
 
     private boolean isClientTrackedPath(String uri) {
-        return uri != null && (HOTEL_SEARCH_PATH.equals(uri) || HOTEL_PREBOOK_PATH.equals(uri) || HOTEL_BOOK_PATH.equals(uri));
+        return uri != null && (HOTEL_SEARCH_PATH.equals(uri)
+                || HOTEL_PREBOOK_PATH.equals(uri)
+                || HOTEL_BOOK_PATH.equals(uri)
+                || HOTEL_GETBOOKINGDETAILS_PATH.equals(uri));
     }
 
     private String resolveClientEventName(String uri) {
         if (HOTEL_PREBOOK_PATH.equals(uri)) return "ClientHotelPreBook";
         if (HOTEL_BOOK_PATH.equals(uri)) return "ClientHotelBook";
+        if (HOTEL_GETBOOKINGDETAILS_PATH.equals(uri)) return "ClientHotelGetBookingDetail";
         return "ClientHotelSearch";
     }
 

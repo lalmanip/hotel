@@ -130,6 +130,9 @@ public class HotelController {
     @Operation(summary = "Get booking details (TBO HotelBE)", description = "Calls TBO Getbookingdetail and returns supplier response.")
     public ResponseEntity<ApiResponse<TboGetBookingDetailResponse>> getBookingDetails(
             @Valid @RequestBody TboGetBookingDetailRequest request) {
+        log.info("[HOTEL] /api/v1/hotels/getbookingdetails called (bookingId={}, traceId={})",
+                request != null ? request.getBookingId() : null,
+                request != null ? request.getTraceId() : null);
         TboGetBookingDetailResponse resp = hotelService.getBookingDetailRawTbo(request);
         return ResponseEntity.ok(ApiResponse.success(resp));
     }

@@ -208,7 +208,8 @@ public class TboApiLogger {
 
             apiEventLogService.saveOrUpdateApiCallEvent(entry);
         } catch (Exception e) {
-            log.error("Failed saving TBO api_call_event_log entry: {}", e.getMessage());
+            log.error("Failed saving TBO api_call_event_log entry (operation={}, eventType={})",
+                    operation, eventType, e);
         }
     }
 

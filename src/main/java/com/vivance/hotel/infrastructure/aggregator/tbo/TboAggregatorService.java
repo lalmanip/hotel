@@ -458,6 +458,7 @@ public class TboAggregatorService implements HotelAggregatorService {
 
         String detailUrl = cfg.getBaseUrl() + cfg.getBookingDetailPath();
         log.info("[TBO] GetBookingDetail: bookingId={}, traceId={}", bookingId, traceId);
+        logTboGetBookingDetailRequest(detailUrl, req);
         // HotelBE endpoints require Basic Auth (same credentials as PreBook/Book).
         TboGetBookingDetailResponse response = postAffiliate(
                 "TboGetBookingDetail",
@@ -470,6 +471,7 @@ public class TboAggregatorService implements HotelAggregatorService {
         TboGetBookingDetailResponse.GetBookingDetailResult result =
                 response.getGetBookingDetailResult();
         validateStatus(result.getResponseStatus(), result.getError(), "TboGetBookingDetail", detailUrl);
+        logTboGetBookingDetailResponse(response);
 
         return result;
     }
@@ -479,45 +481,45 @@ public class TboAggregatorService implements HotelAggregatorService {
      * Getbookingdetail using the incoming payload (EndUserIp, TokenId, BookingId/TraceId).
      * Adds HTTP Basic Auth (same as PreBook/Book).
      */
-    @CircuitBreaker(name = "aggregator", fallbackMethod = "getBookingDetailRawFallback")
-    @Retry(name = "aggregator")
     public TboGetBookingDetailResponse getBookingDetailRaw(TboGetBookingDetailRequest request) {
         if (request == null) {
-            throw new AggregatorException("Request body is required for TBO GetBookingDetail.");
+            throw new IllegalArgumentException("Request body is required for TBO GetBookingDetail.");
         }
         boolean hasBookingId = request.getBookingId() != null && !request.getBookingId().isBlank();
         boolean hasTraceId = request.getTraceId() != null && !request.getTraceId().isBlank();
         if (!hasBookingId && !hasTraceId) {
-            throw new AggregatorException("Provide either BookingId or TraceId for TBO GetBookingDetail.");
-        }
-        if (request.getTokenId() == null || request.getTokenId().isBlank()) {
-            throw new AggregatorException("TokenId is required for TBO GetBookingDetail.");
+            throw new IllegalArgumentException("Provide either BookingId or TraceId for TBO GetBookingDetail.");
         }
         if (request.getEndUserIp() == null || request.getEndUserIp().isBlank()) {
-            throw new AggregatorException("EndUserIp is required for TBO GetBookingDetail.");
+            throw new IllegalArgumentException("EndUserIp is required for TBO GetBookingDetail.");
+        }
+
+        // If frontend didn't pass TokenId, fetch one (same behavior as search).
+        String tokenId = request.getTokenId();
+        if (tokenId == null || tokenId.isBlank()) {
+            log.info("[TBO] No TokenId provided for GetBookingDetail; authenticating...");
+            tokenId = tboAuthService.getValidToken();
+            request.setTokenId(tokenId);
         }
 
         AggregatorProperties.TboConfig cfg = aggregatorProperties.getTbo();
         String detailUrl = cfg.getBaseUrl() + cfg.getBookingDetailPath();
         log.info("[TBO] GetBookingDetail (client): bookingId={}, traceId={}",
                 request.getBookingId(), request.getTraceId());
+        logTboGetBookingDetailRequest(detailUrl, request);
 
         TboGetBookingDetailResponse response = postAffiliate(
                 "TboGetBookingDetailClient",
                 detailUrl,
-                request.getTokenId(),
+                tokenId,
                 request,
                 TboGetBookingDetailResponse.class
         );
 
         TboGetBookingDetailResponse.GetBookingDetailResult result = response.getGetBookingDetailResult();
         validateStatus(result.getResponseStatus(), result.getError(), "TboGetBookingDetailClient", detailUrl);
+        logTboGetBookingDetailResponse(response);
         return response;
-    }
-
-    public TboGetBookingDetailResponse getBookingDetailRawFallback(TboGetBookingDetailRequest request, Throwable t) {
-        log.error("[TBO] Circuit breaker — getBookingDetailRaw: {}", t.getMessage());
-        throw new AggregatorException("TBO GetBookingDetail service is currently unavailable. Please try again later.");
     }
 
     // ─── Console logging helpers ──────────────────────────────────────────────
@@ -630,6 +632,44 @@ public class TboAggregatorService implements HotelAggregatorService {
                     rs, json);
         } catch (Exception e) {
             log.warn("[TBO] Could not serialize book response for logging: {}", e.getMessage());
+        }
+    }
+
+    private void logTboGetBookingDetailRequest(String url, TboGetBookingDetailRequest req) {
+        try {
+            String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(req);
+            log.info("\n" +
+                            "╔══════════════════════════════════════════════════════════════╗\n" +
+                            "║         TBO GETBOOKINGDETAIL — OUTGOING REQUEST             ║\n" +
+                            "╠══════════════════════════════════════════════════════════════╣\n" +
+                            "║ Method : POST                                                ║\n" +
+                            "║ URL    : {}  \n" +
+                            "╠══════════════════════════════════════════════════════════════╣\n" +
+                            "  Request Body:\n{}\n" +
+                            "╚══════════════════════════════════════════════════════════════╝",
+                    url, json);
+        } catch (Exception e) {
+            log.warn("[TBO] Could not serialize GetBookingDetail request for logging: {}", e.getMessage());
+        }
+    }
+
+    private void logTboGetBookingDetailResponse(TboGetBookingDetailResponse response) {
+        try {
+            int rs = response.getGetBookingDetailResult() != null
+                    ? response.getGetBookingDetailResult().getResponseStatus()
+                    : -1;
+            String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(response);
+            log.info("\n" +
+                            "╔══════════════════════════════════════════════════════════════╗\n" +
+                            "║         TBO GETBOOKINGDETAIL — INCOMING RESPONSE            ║\n" +
+                            "╠══════════════════════════════════════════════════════════════╣\n" +
+                            "║ ResponseStatus : {}                                          \n" +
+                            "╠══════════════════════════════════════════════════════════════╣\n" +
+                            "  Response Body:\n{}\n" +
+                            "╚══════════════════════════════════════════════════════════════╝",
+                    rs, json);
+        } catch (Exception e) {
+            log.warn("[TBO] Could not serialize GetBookingDetail response for logging: {}", e.getMessage());
         }
     }
 
