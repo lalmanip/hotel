@@ -5,6 +5,8 @@ import com.vivance.hotel.dto.request.HotelSearchRequest;
 import com.vivance.hotel.dto.request.HotelPreBookRequest;
 import com.vivance.hotel.dto.request.HotelBookRequest;
 import com.vivance.hotel.dto.response.ApiResponse;
+import com.vivance.hotel.dto.response.HotelCityDto;
+import com.vivance.hotel.dto.response.HotelCountryDto;
 import com.vivance.hotel.dto.response.HotelDetailDto;
 import com.vivance.hotel.dto.response.HotelDto;
 import com.vivance.hotel.dto.response.RoomAvailabilityDto;
@@ -14,6 +16,8 @@ import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateSearchRes
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboBookResponse;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboGetBookingDetailRequest;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboGetBookingDetailResponse;
+import com.vivance.hotel.service.HotelCityService;
+import com.vivance.hotel.service.HotelCountryService;
 import com.vivance.hotel.service.HotelService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -39,6 +43,8 @@ import java.util.List;
 public class HotelController {
 
     private final HotelService hotelService;
+    private final HotelCountryService hotelCountryService;
+    private final HotelCityService hotelCityService;
 
     /**
      * POST /api/v1/hotels/search
@@ -135,6 +141,37 @@ public class HotelController {
                 request != null ? request.getTraceId() : null);
         TboGetBookingDetailResponse resp = hotelService.getBookingDetailRawTbo(request);
         return ResponseEntity.ok(ApiResponse.success(resp));
+    }
+
+    /**
+     * GET /api/v1/hotels/countries
+     *
+     * <p>Returns rows from {@code tbo_hotel_countries} for dropdowns (code + name), sorted by name.
+     */
+    @GetMapping("/countries")
+    @Operation(summary = "List hotel countries", description = "All countries from tbo_hotel_countries, ordered by name.")
+    public ResponseEntity<ApiResponse<List<HotelCountryDto>>> listHotelCountries() {
+        List<HotelCountryDto> countries = hotelCountryService.listCountriesOrderedByName();
+        return ResponseEntity.ok(ApiResponse.success(countries));
+    }
+
+    /**
+     * GET /api/v1/hotels/cities?countryCode=...
+     *
+     * <p>Returns rows from {@code tbo_hotel_cities} for the given country, sorted by name.
+     * Use {@code code} as TBO {@code cityId} in hotel search. Pass the country's {@code code}
+     * from {@code /api/v1/hotels/countries} (e.g. {@code IN}), not the numeric {@code id}.
+     */
+    @GetMapping("/cities")
+    @Operation(summary = "List hotel cities by country",
+               description = "Cities from tbo_hotel_cities filtered by country code (matches country_code), ordered by name.")
+    public ResponseEntity<ApiResponse<List<HotelCityDto>>> listHotelCities(
+            @RequestParam("countryCode")
+            @Parameter(description = "Country code (tbo_hotel_cities.country_code), e.g. from countries API `code` field", example = "IN", required = true)
+            String countryCode) {
+
+        List<HotelCityDto> cities = hotelCityService.listCitiesByCountryCode(countryCode);
+        return ResponseEntity.ok(ApiResponse.success(cities));
     }
 
     /**
