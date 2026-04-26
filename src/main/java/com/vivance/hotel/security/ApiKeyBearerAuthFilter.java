@@ -2,7 +2,6 @@ package com.vivance.hotel.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vivance.hotel.dto.response.ApiResponse;
-import com.vivance.hotel.repository.RefreshTokenRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,11 +20,10 @@ import java.io.IOException;
 
 /**
  * Hotel frontend auth gate (same as vivance_api flight flow):
- * requires {@code X-API-KEY} and {@code Authorization: Bearer <refreshToken>}.
+ * requires {@code X-API-KEY} and {@code Authorization: Bearer <Token>}.
  *
- * <p>The Bearer value is a refresh token UUID/string and is validated against
- * {@code refresh_tokens.token_hash} (SHA-256 + base64), ensuring {@code revoked=0}
- * and {@code expires_at > NOW()}.
+ * <p>The Bearer value is the auth_gateway access token JWT and is validated using
+ * {@code auth.jwt.secret} (HS256). Subject is treated as userId.
  *
  * <p>On failure, returns HTTP 401 with a standard {@link ApiResponse} error body.
  */
@@ -34,18 +32,15 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class ApiKeyBearerAuthFilter extends OncePerRequestFilter {
 
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final AuthGatewayJwtService authGatewayJwtService;
     private final ObjectMapper objectMapper;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = normalizePath(request.getRequestURI());
         if (uri == null) return true;
-        // Protect hotel search + affiliate flow endpoints only
-        return !(uri.equals("/api/v1/hotels/search")
-                || uri.equals("/api/v1/hotels/prebook")
-                || uri.equals("/api/v1/hotels/book")
-                || uri.equals("/api/v1/hotels/getbookingdetails"));
+        // Protect all hotel API v1 endpoints (search/prebook/book/getbookingdetails/etc).
+        return !uri.startsWith("/api/v1/hotels/");
     }
 
     @Override
@@ -75,25 +70,17 @@ public class ApiKeyBearerAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Validate refresh token against DB (same semantics as vivance_api)
-        String tokenHash;
-        try {
-            tokenHash = TokenHashUtils.sha256Base64(bearerValue);
-        } catch (Exception e) {
-            log.error("Failed hashing bearer token: {}", e.getMessage(), e);
-            denyAuth(response, "Invalid bearer token");
-            return;
-        }
-
-        var tokenOpt = refreshTokenRepository.findActiveByTokenHash(tokenHash);
-        if (tokenOpt.isEmpty()) {
+        // Validate auth_gateway access token JWT
+        if (!bearerValue.contains(".") || !authGatewayJwtService.isValid(bearerValue)) {
             denyAuth(response, "Invalid or expired bearer token");
             return;
         }
 
+        String userId = authGatewayJwtService.extractUserId(bearerValue);
+
         // Minimal "USER" authority for downstream checks.
         UsernamePasswordAuthenticationToken auth =
-                new UsernamePasswordAuthenticationToken(tokenOpt.get().getUserId(), bearerValue, AuthorityUtils.createAuthorityList("USER"));
+                new UsernamePasswordAuthenticationToken(userId, bearerValue, AuthorityUtils.createAuthorityList("USER"));
         SecurityContextHolder.getContext().setAuthentication(auth);
         filterChain.doFilter(request, response);
     }

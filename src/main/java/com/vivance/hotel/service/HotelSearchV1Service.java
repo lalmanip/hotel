@@ -45,7 +45,7 @@ public class HotelSearchV1Service {
      */
     public TboAffiliateSearchResponse searchRaw(HotelSearchV1Request request) {
         validateRequest(request);
-
+        System.out.println("HotelSearchV1Service.searchRaw called ==========");
         ResolvedCodes resolved = resolveHotelCodes(request);
         if (resolved.hotelCodes.isEmpty()) {
             TboAffiliateSearchResponse empty = new TboAffiliateSearchResponse();
@@ -108,7 +108,7 @@ public class HotelSearchV1Service {
 
     public HotelSearchV1Response search(HotelSearchV1Request request) {
         validateRequest(request);
-
+        System.out.println("HotelSearchV1Service.search called ==========");
         String cacheKey = cacheKey(request);
         HotelSearchV1Response cached = cache.getIfPresent(cacheKey);
         if (cached != null) {
