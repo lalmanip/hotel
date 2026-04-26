@@ -49,6 +49,14 @@ public class HotelSearchRequest {
     @JsonProperty("CityId")
     private String cityId;
 
+    /**
+     * TBO / static DB city code (same as {@code tbo_hotels_static.city_code}). When set together
+     * with {@link #countryCode}, hotel codes are resolved from static data and TBO affiliate
+     * search runs in parallel (one API call per hotel code).
+     */
+    @JsonProperty("Citycode")
+    private String cityCode;
+
     /** Specific aggregator to query. Null means all active aggregators. */
     @JsonProperty("Aggregator")
     private String aggregator;

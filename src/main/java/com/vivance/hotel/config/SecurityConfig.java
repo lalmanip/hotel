@@ -47,9 +47,12 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/hotels/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/hotels/**").permitAll()
+                        // Hotel search is public (frontend does not send auth headers here)
+                        .requestMatchers(HttpMethod.POST, "/api/hotels/search").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/hotels/search").permitAll()
                         // Frontend hotel flow must be protected like vivance_api (X-API-KEY + Bearer refreshToken)
-                        .requestMatchers(HttpMethod.POST, "/api/v1/hotels/search").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/hotels/prebook").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/hotels/book").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/hotels/getbookingdetails").authenticated()

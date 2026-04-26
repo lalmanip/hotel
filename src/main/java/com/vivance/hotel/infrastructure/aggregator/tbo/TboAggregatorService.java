@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -56,13 +57,12 @@ public class TboAggregatorService implements HotelAggregatorService {
     public List<HotelDto> searchHotels(HotelSearchRequest request) {
         AggregatorProperties.TboConfig cfg = aggregatorProperties.getTbo();
         String hotelCodes = request.getHotelCodes();
-        String cityId     = request.getCityId();
 
         log.info("[TBO] ========== searchHotels ENTERED: cityId={}, hotelCodes={}, checkIn={}, checkOut={} ==========",
-                cityId, hotelCodes, request.getCheckIn(), request.getCheckOut());
+                request.getCityId(), hotelCodes, request.getCheckIn(), request.getCheckOut());
 
-        if ((hotelCodes == null || hotelCodes.isBlank()) && (cityId == null || cityId.isBlank())) {
-            throw new AggregatorException("TBO Search requires either hotelCodes or cityId in the request.");
+        if (hotelCodes == null || hotelCodes.isBlank()) {
+            throw new AggregatorException("TBO Search requires HotelCodes (CityId is not sent to TBO).");
         }
 
         String token;
@@ -119,7 +119,6 @@ public class TboAggregatorService implements HotelAggregatorService {
                 .checkIn(request.getCheckIn().toString())
                 .checkOut(request.getCheckOut().toString())
                 .hotelCodes(hotelCodes != null && !hotelCodes.isBlank() ? hotelCodes : null)
-                .cityId(cityId != null && !cityId.isBlank() ? cityId : null)
                 .guestNationality(request.getGuestNationality() != null ? request.getGuestNationality() : "IN")
                 .paxRooms(paxRooms)
                 .responseTime(request.getResponseTime() != null ? request.getResponseTime() : 23.0)
@@ -165,22 +164,35 @@ public class TboAggregatorService implements HotelAggregatorService {
     @CircuitBreaker(name = "aggregator", fallbackMethod = "searchHotelsRawFallback")
     @Retry(name = "aggregator")
     public TboAffiliateSearchResponse searchHotelsRaw(HotelSearchRequest request) {
-        // Build exactly the same outbound body as searchHotels(), but return parsed raw response.
         AggregatorProperties.TboConfig cfg = aggregatorProperties.getTbo();
         String hotelCodes = request.getHotelCodes();
-        String cityId     = request.getCityId();
 
-        if ((hotelCodes == null || hotelCodes.isBlank()) && (cityId == null || cityId.isBlank())) {
-            throw new AggregatorException("TBO Search requires either hotelCodes or cityId in the request.");
+        if (hotelCodes == null || hotelCodes.isBlank()) {
+            throw new AggregatorException("TBO Search requires HotelCodes (CityId is not sent to TBO).");
         }
 
-        String token;
+        String token = resolveAffiliateSearchToken(request);
+        TboAffiliateSearchRequest tboReq = buildAffiliateSearchRequest(request, hotelCodes, token, null);
+        return postAffiliateSearchRawValidated(tboReq, cfg.getAffiliateSearchUrl());
+    }
+
+    public String resolveAffiliateSearchToken(HotelSearchRequest request) {
         if (request.getTokenId() != null && !request.getTokenId().isBlank()) {
-            token = request.getTokenId();
-        } else {
-            token = tboAuthService.getValidToken();
+            return request.getTokenId();
         }
+        return tboAuthService.getValidToken();
+    }
 
+    /**
+     * @param responseTimeOverride when non-null, sent as TBO {@code ResponseTime} (used for static-city per-hotel parallel searches)
+     */
+    public TboAffiliateSearchRequest buildAffiliateSearchRequest(
+            HotelSearchRequest request,
+            String hotelCodesCsv,
+            String tokenId,
+            Double responseTimeOverride) {
+
+        AggregatorProperties.TboConfig cfg = aggregatorProperties.getTbo();
         int guestCount = request.effectiveGuests();
         int roomCount = request.getNoOfRooms() != null && request.getNoOfRooms() > 0
                 ? request.getNoOfRooms()
@@ -210,23 +222,32 @@ public class TboAggregatorService implements HotelAggregatorService {
         if (request.getFilters() != null && request.getFilters().getStarRating() != null) {
             String sr = request.getFilters().getStarRating().trim();
             if (!sr.isEmpty()) {
-                try { starRating = Integer.parseInt(sr); } catch (NumberFormatException ignore) { }
+                try {
+                    starRating = Integer.parseInt(sr);
+                } catch (NumberFormatException ignore) {
+                    starRating = null;
+                }
             }
         }
         if (starRating == null) {
             starRating = request.getMinStarRating();
         }
 
-        TboAffiliateSearchRequest tboReq = TboAffiliateSearchRequest.builder()
+        String hc = hotelCodesCsv != null && !hotelCodesCsv.isBlank() ? hotelCodesCsv : null;
+
+        double responseTime = responseTimeOverride != null
+                ? responseTimeOverride
+                : (request.getResponseTime() != null ? request.getResponseTime() : 23.0);
+
+        return TboAffiliateSearchRequest.builder()
                 .checkIn(request.getCheckIn().toString())
                 .checkOut(request.getCheckOut().toString())
-                .hotelCodes(hotelCodes != null && !hotelCodes.isBlank() ? hotelCodes : null)
-                .cityId(cityId != null && !cityId.isBlank() ? cityId : null)
+                .hotelCodes(hc)
                 .guestNationality(request.getGuestNationality() != null ? request.getGuestNationality() : "IN")
                 .paxRooms(paxRooms)
-                .responseTime(request.getResponseTime() != null ? request.getResponseTime() : 23.0)
+                .responseTime(responseTime)
                 .isDetailedResponse(request.getIsDetailedResponse() != null ? request.getIsDetailedResponse() : true)
-                .tokenId(token)
+                .tokenId(tokenId)
                 .endUserIp(request.getEndUserIp() != null && !request.getEndUserIp().isBlank()
                         ? request.getEndUserIp()
                         : cfg.getEndUserIp())
@@ -237,17 +258,40 @@ public class TboAggregatorService implements HotelAggregatorService {
                         .starRating(starRating)
                         .build())
                 .build();
+    }
 
-        String searchUrl = cfg.getAffiliateSearchUrl();
+    public TboAffiliateSearchResponse postAffiliateSearchRawValidated(
+            TboAffiliateSearchRequest tboReq, String searchUrl) {
         TboAffiliateSearchResponse response = postAffiliate(
                 "TboAffiliateSearchRaw",
                 searchUrl,
-                token,
+                tboReq.getTokenId(),
                 tboReq,
                 TboAffiliateSearchResponse.class
         );
         validateAffiliateStatus(response.getStatus(), "TboAffiliateSearchRaw", searchUrl);
         return response;
+    }
+
+    /**
+     * Single affiliate Search call that does not throw on supplier non-200 (parallel per-hotel fan-out).
+     */
+    public Optional<TboAffiliateSearchResponse> postAffiliateSearchRawLenient(String logOperation, TboAffiliateSearchRequest tboReq) {
+        AggregatorProperties.TboConfig cfg = aggregatorProperties.getTbo();
+        String searchUrl = cfg.getAffiliateSearchUrl();
+        try {
+            TboAffiliateSearchResponse response = postAffiliate(
+                    logOperation,
+                    searchUrl,
+                    tboReq.getTokenId(),
+                    tboReq,
+                    TboAffiliateSearchResponse.class
+            );
+            return Optional.ofNullable(response);
+        } catch (Exception e) {
+            log.warn("[TBO] {} failed: {}", logOperation, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /**

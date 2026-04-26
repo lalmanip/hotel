@@ -1,7 +1,7 @@
 package com.vivance.hotel.controller;
 
 import com.vivance.hotel.domain.enums.AggregatorType;
-import com.vivance.hotel.dto.request.HotelSearchRequest;
+import com.vivance.hotel.dto.request.HotelSearchV1Request;
 import com.vivance.hotel.dto.request.HotelPreBookRequest;
 import com.vivance.hotel.dto.request.HotelBookRequest;
 import com.vivance.hotel.dto.response.ApiResponse;
@@ -9,6 +9,7 @@ import com.vivance.hotel.dto.response.HotelCityDto;
 import com.vivance.hotel.dto.response.HotelCountryDto;
 import com.vivance.hotel.dto.response.HotelDetailDto;
 import com.vivance.hotel.dto.response.HotelDto;
+import com.vivance.hotel.dto.response.HotelSearchV1Response;
 import com.vivance.hotel.dto.response.RoomAvailabilityDto;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliatePreBookResponse;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateBookRequest;
@@ -16,8 +17,11 @@ import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateSearchRes
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboBookResponse;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboGetBookingDetailRequest;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboGetBookingDetailResponse;
+import com.vivance.hotel.config.RequestLoggingConfig;
+import com.vivance.hotel.domain.entity.ApiAccessLog;
 import com.vivance.hotel.service.HotelCityService;
 import com.vivance.hotel.service.HotelCountryService;
+import com.vivance.hotel.service.HotelSearchV1Service;
 import com.vivance.hotel.service.HotelService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -31,53 +35,54 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
 import java.util.List;
 
 @Slf4j
 @Validated
 @RestController
-@RequestMapping("/api/v1/hotels")
+@RequestMapping({"/api/hotels", "/api/v1/hotels"})
 @RequiredArgsConstructor
 @Tag(name = "Hotels", description = "Hotel search, details, and room availability")
 public class HotelController {
 
     private final HotelService hotelService;
+    private final HotelSearchV1Service hotelSearchV1Service;
     private final HotelCountryService hotelCountryService;
     private final HotelCityService hotelCityService;
 
     /**
      * POST /api/v1/hotels/search
      *
-     * <p>For TBO, {@code cityId} (TBO's numeric city code) and {@code countryCode} are required.
-     * The response includes {@code traceId} and {@code resultIndex} per hotel — store these
-     * and pass them in hotel-detail and availability calls.
+     * <p>For TBO, pass {@code HotelCodes}, or {@code Citycode} + {@code CountryCode} to resolve hotel codes
+     * from {@code tbo_hotels_static}
+     * and run parallel affiliate Search (one TBO call per hotel code; first response within
+     * {@code ResponseTime} budget, remaining calls continue in the background and are cached for repeat searches).
+     * The response includes {@code traceId} and {@code resultIndex} per hotel when applicable —
+     * store these for hotel-detail and availability calls.
      */
     @PostMapping("/search")
     @Operation(summary = "Search hotels by city, dates, and guest count",
-               description = "TBO: supply cityId (numeric TBO city code). Response includes " +
-                             "traceId and resultIndex per hotel — required for all follow-up calls.")
-    public ResponseEntity<ApiResponse<?>> searchHotels(
-            @Valid @RequestBody HotelSearchRequest request) {
+               description = "Searches TBO by hotel codes. If destinationId is provided, hotel codes are paged from DB (tbo_hotels_static.city_code) then searched in TBO in chunks.")
+    public ResponseEntity<ApiResponse<TboAffiliateSearchResponse>> searchHotels(
+            @Valid @RequestBody HotelSearchV1Request request) {
 
-        log.debug("Hotel search: city={}, cityId={}, checkIn={}, checkOut={}, guests={}",
-                request.getCity(), request.getCityId(),
-                request.getCheckIn(), request.getCheckOut(), request.getGuests());
+        TboAffiliateSearchResponse resp = hotelSearchV1Service.searchRaw(request);
+        return ResponseEntity.ok(ApiResponse.success(resp));
+    }
 
-        // If frontend is using TBO affiliate schema, return the raw TBO response.
-        // Auto-detect TBO affiliate search when HotelCodes/CityId are provided (even if Aggregator is omitted).
-        boolean isTboRawSearch =
-                (request.getAggregator() != null && "TBO".equalsIgnoreCase(request.getAggregator()))
-                        || ((request.getHotelCodes() != null && !request.getHotelCodes().isBlank())
-                        || (request.getCityId() != null && !request.getCityId().isBlank()));
-
-        if (isTboRawSearch) {
-            TboAffiliateSearchResponse raw = hotelService.searchHotelsRawTbo(request);
-            return ResponseEntity.ok(ApiResponse.success(raw));
-        }
-
-        List<HotelDto> results = hotelService.searchHotels(request);
-        return ResponseEntity.ok(ApiResponse.success("Found " + results.size() + " hotels", results));
+    /**
+     * Optional mapped/normalized response for UI use-cases.
+     * If you only want raw TBO, use {@code POST /api/v1/hotels/search}.
+     */
+    @PostMapping("/search/mapped")
+    @Operation(summary = "Search hotels (mapped response)",
+            description = "Returns a simplified mapped response (name/price/amenities). Prefer /search for raw TBO payload.")
+    public ResponseEntity<ApiResponse<HotelSearchV1Response>> searchHotelsMapped(
+            @Valid @RequestBody HotelSearchV1Request request) {
+        HotelSearchV1Response resp = hotelSearchV1Service.search(request);
+        return ResponseEntity.ok(ApiResponse.success(resp));
     }
 
     /**
@@ -89,10 +94,17 @@ public class HotelController {
     @PostMapping("/prebook")
     @Operation(summary = "PreBook (TBO affiliate)", description = "Calls TBO affiliate PreBook and returns supplier response.")
     public ResponseEntity<ApiResponse<TboAffiliatePreBookResponse>> preBook(
+            HttpServletRequest httpServletRequest,
             @Valid @RequestBody HotelPreBookRequest request) {
 
         // Auto-detect TBO for now (this endpoint is only defined for TBO affiliate flow).
-        TboAffiliatePreBookResponse resp = hotelService.preBookRawTbo(
+        String userSessionId = null;
+        Object attr = httpServletRequest.getAttribute(RequestLoggingConfig.API_ACCESS_LOG_ATTR);
+        if (attr instanceof ApiAccessLog accessLog) {
+            userSessionId = accessLog.getUserSessionId();
+        }
+        TboAffiliatePreBookResponse resp = hotelService.preBookRawTboAndRecordItinerary(
+                userSessionId,
                 request.getBookingCode(),
                 request.getPaymentMode()
         );

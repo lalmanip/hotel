@@ -19,9 +19,6 @@ public class TboAffiliateSearchRequest {
     @JsonProperty("HotelCodes")
     private String hotelCodes;
 
-    @JsonProperty("CityId")
-    private String cityId;
-
     @JsonProperty("GuestNationality")
     private String guestNationality;
 

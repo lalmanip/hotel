@@ -36,6 +36,7 @@ public class AggregatorManagerService {
 
     private final AggregatorFactory aggregatorFactory;
     private final AggregatorProperties aggregatorProperties;
+    private final TboHotelChunkSearchOrchestrator tboHotelChunkSearchOrchestrator;
 
     /** Fans out to all active aggregators in parallel, merges results. */
     public List<HotelDto> searchHotels(HotelSearchRequest request) {
@@ -72,6 +73,10 @@ public class AggregatorManagerService {
         List<AggregatorType> types = resolveActiveAggregators(request.getAggregator());
         if (types.size() != 1 || types.get(0) != AggregatorType.TBO) {
             throw new IllegalArgumentException("Raw search is only supported for aggregator=TBO.");
+        }
+
+        if (tboHotelChunkSearchOrchestrator.supportsStaticCityChunkSearch(request)) {
+            return tboHotelChunkSearchOrchestrator.searchByStaticCity(request);
         }
 
         var agg = aggregatorFactory.getAggregator(AggregatorType.TBO);

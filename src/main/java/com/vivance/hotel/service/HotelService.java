@@ -39,6 +39,7 @@ public class HotelService {
     private final AggregatorMappingRepository aggregatorMappingRepository;
     private final HotelMapper hotelMapper;
     private final AggregatorManagerService aggregatorManagerService;
+    private final ApiSessionItineraryService apiSessionItineraryService;
 
     /**
      * Searches hotels by querying all active aggregators and also the local DB.
@@ -83,7 +84,16 @@ public class HotelService {
 
     @Transactional(readOnly = true)
     public TboAffiliatePreBookResponse preBookRawTbo(String bookingCode, String paymentMode) {
+        // Backwards compatible method: no userSessionId so we can't persist itinerary.
         return aggregatorManagerService.preBookRawTbo(bookingCode, paymentMode);
+    }
+
+    @Transactional
+    public TboAffiliatePreBookResponse preBookRawTboAndRecordItinerary(
+            String traceId, String bookingCode, String paymentMode) {
+        TboAffiliatePreBookResponse resp = aggregatorManagerService.preBookRawTbo(bookingCode, paymentMode);
+        apiSessionItineraryService.recordPreBook(traceId, bookingCode, resp);
+        return resp;
     }
 
     @Transactional(readOnly = true)

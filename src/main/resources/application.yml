@@ -71,6 +71,13 @@ hotel:
       affiliate-search-url: https://affiliate.tektravels.com/HotelAPI/Search
       affiliate-pre-book-url: https://affiliate.tektravels.com/HotelAPI/PreBook
 
+  search:
+    # Max hotel codes per TBO Search request (TBO typically supports ~100).
+    tbo-hotel-codes-chunk-size: 100
+    cache:
+      maximum-size: 5000
+      ttl: 5m
+
 # ─── Resilience4j ─────────────────────────────────────────────────────────────
 resilience4j:
   circuitbreaker:
