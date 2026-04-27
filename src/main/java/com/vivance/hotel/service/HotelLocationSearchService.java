@@ -3,6 +3,7 @@ package com.vivance.hotel.service;
 import com.vivance.hotel.dto.response.LocationSearchResultDto;
 import com.vivance.hotel.repository.HotelRepository;
 import com.vivance.hotel.repository.TboHotelCityRepository;
+import com.vivance.hotel.repository.TboHotelStaticRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +21,7 @@ public class HotelLocationSearchService {
 
     private final TboHotelCityRepository tboHotelCityRepository;
     private final HotelRepository hotelRepository;
+    private final TboHotelStaticRepository tboHotelStaticRepository;
 
     public List<LocationSearchResultDto> searchLocations(String query, Integer limit) {
         String q = query == null ? "" : query.trim();
@@ -49,7 +51,8 @@ public class HotelLocationSearchService {
 
         // 2) Hotels second (prefix then contains), only if we still have space
         if (out.size() < finalLimit) {
-            addHotels(q, finalLimit, out, hotelIds);
+            // Prefer TBO static hotels (available in vivance_java) over local 'hotels' table.
+            addStaticHotels(q, finalLimit, out, hotelIds);
         }
 
         return out;
@@ -120,6 +123,45 @@ public class HotelLocationSearchService {
                     .id(String.valueOf(h.getId()))
                     .name(h.getName())
                     .secondaryText(formatHotelSecondaryText(h.getCity(), h.getCountry()))
+                    .build());
+        }
+    }
+
+    private void addStaticHotels(String q, int finalLimit, List<LocationSearchResultDto> out, Set<Long> hotelIds) {
+        int remaining = finalLimit - out.size();
+        if (remaining <= 0) return;
+
+        // NOTE: we use String hash as a stable-ish de-dupe key here because static hotels don't have Long IDs in the API.
+        List<TboHotelStaticRepository.StaticHotelLocationRow> prefix =
+                tboHotelStaticRepository.searchStaticHotelsByNamePrefix(q, remaining);
+        for (TboHotelStaticRepository.StaticHotelLocationRow h : prefix) {
+            if (out.size() >= finalLimit) break;
+            if (h == null || h.getHotelCode() == null) continue;
+            long key = h.getHotelCode().hashCode();
+            if (!hotelIds.add(key)) continue;
+            out.add(LocationSearchResultDto.builder()
+                    .type("hotel")
+                    .id(h.getHotelCode())
+                    .name(h.getHotelName() != null ? h.getHotelName() : h.getHotelCode())
+                    .secondaryText(formatHotelSecondaryText(h.getCityName(), h.getCountryName()))
+                    .build());
+        }
+
+        remaining = finalLimit - out.size();
+        if (remaining <= 0) return;
+
+        List<TboHotelStaticRepository.StaticHotelLocationRow> contains =
+                tboHotelStaticRepository.searchStaticHotelsByNameContainsExcludingPrefix(q, remaining);
+        for (TboHotelStaticRepository.StaticHotelLocationRow h : contains) {
+            if (out.size() >= finalLimit) break;
+            if (h == null || h.getHotelCode() == null) continue;
+            long key = h.getHotelCode().hashCode();
+            if (!hotelIds.add(key)) continue;
+            out.add(LocationSearchResultDto.builder()
+                    .type("hotel")
+                    .id(h.getHotelCode())
+                    .name(h.getHotelName() != null ? h.getHotelName() : h.getHotelCode())
+                    .secondaryText(formatHotelSecondaryText(h.getCityName(), h.getCountryName()))
                     .build());
         }
     }
