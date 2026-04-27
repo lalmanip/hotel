@@ -9,7 +9,7 @@ on:
       - develop
 
 env:
-  IMAGE_NAME: vivance/hotel
+  IMAGE_NAME: vivance/hotel-api
 
 jobs:
   build-and-test:
