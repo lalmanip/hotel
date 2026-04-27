@@ -57,12 +57,19 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Resolve Maven project version
+        id: version
+        run: |
+          VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Compute image tags
         id: tags
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          echo "primary=develop" >> $GITHUB_OUTPUT
-          echo "secondary=develop-$SHORT_SHA" >> $GITHUB_OUTPUT
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "primary=${VERSION}" >> $GITHUB_OUTPUT
+          echo "secondary=${VERSION}-${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
