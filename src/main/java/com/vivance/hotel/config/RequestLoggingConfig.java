@@ -310,9 +310,12 @@ public class RequestLoggingConfig implements Filter {
 
     private void appendRequestHeaders(StringBuilder sb, HttpServletRequest req) {
         sb.append("\n Headers:");
-        Collections.list(req.getHeaderNames()).forEach(name ->
-                sb.append("\n   ").append(name).append(": ").append(maskIfSensitive(name, req.getHeader(name)))
-        );
+        Collections.list(req.getHeaderNames()).forEach(name -> {
+            String value = req.getHeader(name);
+            // TEMPORARY — print Authorization raw for token debugging; restore masking when done
+            String logged = "authorization".equalsIgnoreCase(name) ? value : maskIfSensitive(name, value);
+            sb.append("\n   ").append(name).append(": ").append(logged);
+        });
     }
 
     // ─── Response logging ─────────────────────────────────────────────────────

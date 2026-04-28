@@ -2,6 +2,7 @@ package com.vivance.hotel.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vivance.hotel.dto.response.ApiResponse;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -50,14 +51,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String token = authToken.getToken();
-        if (!jwtService.isValid(token)) {
-            log.warn("[AUTH] JWT validation failed for request {} from {}",
-                    request.getRequestURI(), request.getRemoteAddr());
+        String userId;
+        try {
+            userId = jwtService.extractUserId(token);
+        } catch (JwtException | IllegalArgumentException e) {
+            // TEMPORARY — log full reason for debugging; remove once token issue is resolved
+            log.warn("[AUTH] JWT rejected for {} — {}: {}", request.getRequestURI(),
+                    e.getClass().getSimpleName(), e.getMessage());
             deny(response, "Invalid or expired JWT token");
             return;
         }
-
-        String userId = jwtService.extractUserId(token);
         authToken.setUserSessionId(userId);
         request.setAttribute(ApiKeyBearerAuthFilter.SESSION_ATTR, authToken);
 
