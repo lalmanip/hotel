@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -40,7 +41,7 @@ import java.util.Date;
  */
 @Slf4j
 @Component
-@Order(1)
+@Order(Ordered.HIGHEST_PRECEDENCE + 5)
 public class RequestLoggingConfig implements Filter {
 
     /** Paths that carry no interesting bodies — skip body logging for these. */
@@ -66,6 +67,7 @@ public class RequestLoggingConfig implements Filter {
     private static final String HOTEL_PREBOOK_PATH = "/api/v1/hotels/prebook";
     private static final String HOTEL_BOOK_PATH = "/api/v1/hotels/book";
     private static final String HOTEL_GETBOOKINGDETAILS_PATH = "/api/v1/hotels/getbookingdetails";
+    private static final String HOTEL_LOCATIONS_PATH = "/api/v1/hotels/locations";
     private static final String CLIENT_REQ_EVENT_ID_ATTR = "CLIENT_VIVANCE_REQ_EVENT_ID";
 
     @Autowired
@@ -121,8 +123,10 @@ public class RequestLoggingConfig implements Filter {
             chain.doFilter(wrappedReq, wrappedResp);
         } finally {
             long duration = System.currentTimeMillis() - start;
-            logRequest(wrappedReq, traceId);
-            logResponse(wrappedResp, wrappedReq.getRequestURI(), duration, traceId);
+            if (isClientTrackedPath(wrappedReq.getRequestURI())) {
+                logRequest(wrappedReq, traceId);
+                logResponse(wrappedResp, wrappedReq.getRequestURI(), duration, traceId);
+            }
             // Now that the request body has been consumed by MVC, the wrapper contains cached bytes.
             // Update the already-inserted CLIENT request row so content is not empty.
             updateClientRequestEventContent(wrappedReq);
@@ -239,16 +243,21 @@ public class RequestLoggingConfig implements Filter {
     }
 
     private boolean isClientTrackedPath(String uri) {
-        return uri != null && (HOTEL_SEARCH_PATH.equals(uri)
-                || HOTEL_PREBOOK_PATH.equals(uri)
-                || HOTEL_BOOK_PATH.equals(uri)
-                || HOTEL_GETBOOKINGDETAILS_PATH.equals(uri));
+        if (uri == null) return false;
+        return uri.endsWith("/search")
+                || uri.endsWith("/prebook")
+                || uri.endsWith("/book")
+                || uri.endsWith("/getbookingdetails")
+                || uri.endsWith("/locations")
+                || uri.endsWith("/location");
     }
 
     private String resolveClientEventName(String uri) {
-        if (HOTEL_PREBOOK_PATH.equals(uri)) return "ClientHotelPreBook";
-        if (HOTEL_BOOK_PATH.equals(uri)) return "ClientHotelBook";
-        if (HOTEL_GETBOOKINGDETAILS_PATH.equals(uri)) return "ClientHotelGetBookingDetail";
+        if (uri == null) return "ClientHotelSearch";
+        if (uri.endsWith("/prebook")) return "ClientHotelPreBook";
+        if (uri.endsWith("/book")) return "ClientHotelBook";
+        if (uri.endsWith("/getbookingdetails")) return "ClientHotelGetBookingDetail";
+        if (uri.endsWith("/locations") || uri.endsWith("/location")) return "ClientHotelLocations";
         return "ClientHotelSearch";
     }
 
@@ -367,14 +376,41 @@ public class RequestLoggingConfig implements Filter {
                 .orElse("   " + body);
     }
 
-    /** Masks sensitive header values — shows first 8 chars then ****. */
+    /** Masks sensitive header values. For Bearer JWT tokens, decodes the header+payload
+     *  (public base64 data, no secret needed) so the token is identifiable for debugging. */
     private String maskIfSensitive(String headerName, String value) {
         if (headerName == null || value == null) return value;
         String lower = headerName.toLowerCase();
-        if (lower.equals("authorization") || lower.equals("x-api-key") || lower.equals("cookie")) {
+        if (lower.equals("authorization")) {
+            return maskAuthorizationHeader(value);
+        }
+        if (lower.equals("x-api-key") || lower.equals("cookie")) {
             if (value.length() <= 8) return "****";
             return value.substring(0, 8) + "****";
         }
         return value;
+    }
+
+    private String maskAuthorizationHeader(String value) {
+        if (value == null) return null;
+        if (value.startsWith("Bearer ")) {
+            String token = value.substring(7).trim();
+            try {
+                String[] parts = token.split("\\.");
+                if (parts.length >= 2) {
+                    String header  = new String(java.util.Base64.getUrlDecoder().decode(padBase64(parts[0])));
+                    String payload = new String(java.util.Base64.getUrlDecoder().decode(padBase64(parts[1])));
+                    return "Bearer [header=" + header + " | payload=" + payload + " | sig=<hidden>]";
+                }
+            } catch (Exception ignored) {}
+        }
+        if (value.length() <= 8) return "****";
+        return value.substring(0, 8) + "****";
+    }
+
+    private String padBase64(String s) {
+        int rem = s.length() % 4;
+        if (rem > 0) s = s + "=".repeat(4 - rem);
+        return s;
     }
 }

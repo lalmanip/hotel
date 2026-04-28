@@ -62,7 +62,7 @@ public class JwtTokenProvider {
             log.warn("JWT token is unsupported: {}", e.getMessage());
         } catch (MalformedJwtException e) {
             log.warn("JWT token is malformed: {}", e.getMessage());
-        } catch (SecurityException e) {
+        } catch (io.jsonwebtoken.security.SecurityException e) {
             log.warn("JWT signature validation failed: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
             log.warn("JWT claims string is empty: {}", e.getMessage());
