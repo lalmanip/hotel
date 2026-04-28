@@ -1,75 +1,78 @@
 package com.vivance.hotel.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vivance.hotel.dto.response.ApiResponse;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.lang.NonNull;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+/**
+ * Second-pass gate (inside the Spring Security filter chain):
+ * Reads the {@link JwtAuthToken} placed by {@link ApiKeyBearerAuthFilter},
+ * validates the JWT via {@link AuthGatewayJwtService}, extracts the userId (sub),
+ * and sets an authenticated {@link UsernamePasswordAuthenticationToken} in the
+ * {@link SecurityContextHolder}.
+ *
+ * <p>If no session attribute is present the request is for a public endpoint —
+ * the filter passes through without blocking. Returns HTTP 403 for invalid or
+ * expired JWTs.
+ *
+ * <p>Not a {@code @Component}: instantiated in {@link com.vivance.hotel.config.SecurityConfig}
+ * to prevent Spring Boot auto-registering it as a duplicate servlet filter.
+ */
 @Slf4j
-@Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final JwtTokenProvider tokenProvider;
-    private final UserDetailsService userDetailsService;
+    private final AuthGatewayJwtService jwtService;
+    private final ObjectMapper objectMapper;
 
     @Override
-    protected void doFilterInternal(
-            @NonNull HttpServletRequest request,
-            @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain
-    ) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
 
-        String token = resolveToken(request);
+        JwtAuthToken authToken = (JwtAuthToken) request.getAttribute(ApiKeyBearerAuthFilter.SESSION_ATTR);
 
-        // Frontend uses Bearer refresh tokens (non-JWT) for hotel flow.
-        // Only attempt JWT validation when the token looks like a JWT (has 2 dots).
-        if (StringUtils.hasText(token) && looksLikeJwt(token) && tokenProvider.validateToken(token)) {
-            String username = tokenProvider.extractUsername(token);
-
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails, null, userDetails.getAuthorities()
-                        );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-            }
+        // No attribute → public endpoint (ApiKeyBearerAuthFilter skipped it)
+        if (authToken == null) {
+            filterChain.doFilter(request, response);
+            return;
         }
+
+        String token = authToken.getToken();
+        if (!jwtService.isValid(token)) {
+            log.warn("[AUTH] JWT validation failed for request {} from {}",
+                    request.getRequestURI(), request.getRemoteAddr());
+            deny(response, "Invalid or expired JWT token");
+            return;
+        }
+
+        String userId = jwtService.extractUserId(token);
+        authToken.setUserSessionId(userId);
+        request.setAttribute(ApiKeyBearerAuthFilter.SESSION_ATTR, authToken);
+
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(
+                        userId, authToken, AuthorityUtils.createAuthorityList("USER"));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
         filterChain.doFilter(request, response);
     }
 
-    private static boolean looksLikeJwt(String token) {
-        int dots = 0;
-        for (int i = 0; i < token.length(); i++) {
-            if (token.charAt(i) == '.') dots++;
-            if (dots > 2) return false;
-        }
-        return dots == 2;
-    }
-
-    /** Extracts the Bearer token from the Authorization header. */
-    private String resolveToken(HttpServletRequest request) {
-        String bearerToken = request.getHeader("Authorization");
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
-        }
-        return null;
+    private void deny(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpStatus.FORBIDDEN.value());
+        response.setContentType("application/json");
+        response.getWriter().write(objectMapper.writeValueAsString(
+                ApiResponse.error(message, "AUTHENTICATION_FAILED")));
     }
 }

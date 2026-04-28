@@ -23,6 +23,8 @@ public class JwtTokenProvider {
     private long jwtExpirationMs;
 
     private SecretKey signingKey() {
+        log.warn("[JWT-DEBUG] jwt.secret value = '{}' (decoded byte length={})",
+                jwtSecret, Decoders.BASE64.decode(jwtSecret).length);
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
         return Keys.hmacShaKeyFor(keyBytes);
     }
