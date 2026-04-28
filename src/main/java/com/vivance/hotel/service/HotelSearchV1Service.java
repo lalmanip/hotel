@@ -47,6 +47,15 @@ public class HotelSearchV1Service {
         validateRequest(request);
         System.out.println("HotelSearchV1Service.searchRaw called ==========");
         ResolvedCodes resolved = resolveHotelCodes(request);
+        // TEMPORARY — log resolved hotel codes for TBO debugging
+        log.info("[TBO-DEBUG] Resolved {}/{} hotel code(s) for destinationId={} hotelCode={} page={} size={}",
+                resolved.hotelCodes.size(), resolved.total,
+                request.getDestinationId(), request.getHotelCode(),
+                request.getPagination() != null ? request.getPagination().getPage() : 1,
+                request.getPagination() != null ? request.getPagination().getSize() : "?");
+        if (!resolved.hotelCodes.isEmpty()) {
+            log.info("[TBO-DEBUG] Hotel codes to be sent to TBO: {}", resolved.hotelCodes);
+        }
         if (resolved.hotelCodes.isEmpty()) {
             TboAffiliateSearchResponse empty = new TboAffiliateSearchResponse();
             var st = new com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateStatus();
@@ -237,12 +246,36 @@ public class HotelSearchV1Service {
         String csv = String.join(",", codes);
         TboAffiliateSearchRequest tboReq = tboAggregatorService.buildAffiliateSearchRequest(base, csv, tokenId, null);
 
+        // TEMPORARY — log TBO request params for debugging
+        log.info("[TBO-DEBUG] >>> CHUNK[{}] REQUEST to TBO: checkIn={} checkOut={} nationality={} paxRooms={} hotelCodes=[{}]",
+                chunkIndex, tboReq.getCheckIn(), tboReq.getCheckOut(),
+                tboReq.getGuestNationality(), tboReq.getPaxRooms(), csv);
+
         long start = System.nanoTime();
         Optional<TboAffiliateSearchResponse> resp = tboAggregatorService.postAffiliateSearchRawLenient(
                 "TboAffiliateSearchChunk[" + chunkIndex + "|n=" + codes.size() + "]",
                 tboReq
         );
         long tookMs = (System.nanoTime() - start) / 1_000_000L;
+
+        // TEMPORARY — log TBO response summary for debugging
+        if (resp.isPresent()) {
+            TboAffiliateSearchResponse r = resp.get();
+            int hotelCount = r.getHotelResult() != null ? r.getHotelResult().size() : 0;
+            String status = r.getStatus() != null
+                    ? r.getStatus().getCode() + " / " + r.getStatus().getDescription()
+                    : "null";
+            log.info("[TBO-DEBUG] <<< CHUNK[{}] RESPONSE from TBO: status=[{}] hotelCount={} tookMs={}",
+                    chunkIndex, status, hotelCount, tookMs);
+            if (hotelCount == 0) {
+                log.warn("[TBO-DEBUG] CHUNK[{}] TBO returned 0 hotels for codes=[{}] — full response status=[{}]",
+                        chunkIndex, csv, status);
+            }
+        } else {
+            log.warn("[TBO-DEBUG] <<< CHUNK[{}] RESPONSE: call failed or threw exception (check WARN logs above) tookMs={}",
+                    chunkIndex, tookMs);
+        }
+
         log.info("[HOTEL-SEARCH] TBO chunk {} (n={}) took {}ms success={}",
                 chunkIndex, codes.size(), tookMs, resp.isPresent());
 
