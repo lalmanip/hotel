@@ -30,5 +30,11 @@ public class LocationSearchResultDto {
      * City: country code. Hotel: city/country.
      */
     private String secondaryText;
+
+    /**
+     * Optional geo coordinates for map / nearby ranking.
+     */
+    private Double latitude;
+    private Double longitude;
 }
 

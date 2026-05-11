@@ -363,8 +363,10 @@ public class HotelSearchV1Service {
         base.setPaxRooms(r.getRooms().stream().map(room -> {
             HotelSearchRequest.PaxRoom pr = new HotelSearchRequest.PaxRoom();
             pr.setAdults(room.getAdults());
-            pr.setChildren(room.getChildren() != null ? room.getChildren().size() : 0);
-            pr.setChildrenAges(room.getChildren());
+            List<Integer> children = room.getChildren();
+            int childCount = children != null ? children.size() : 0;
+            pr.setChildren(childCount);
+            pr.setChildrenAges(childCount > 0 ? children : null);
             return pr;
         }).toList());
         return base;

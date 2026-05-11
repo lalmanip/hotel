@@ -11,12 +11,14 @@ import com.vivance.hotel.dto.response.HotelDetailDto;
 import com.vivance.hotel.dto.response.HotelDto;
 import com.vivance.hotel.dto.response.HotelSearchV1Response;
 import com.vivance.hotel.dto.response.RoomAvailabilityDto;
+import com.vivance.hotel.dto.response.TboHotelStaticDetailsSyncResult;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliatePreBookResponse;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateBookRequest;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboAffiliateSearchResponse;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboBookResponse;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboGetBookingDetailRequest;
 import com.vivance.hotel.infrastructure.aggregator.tbo.dto.TboGetBookingDetailResponse;
+import com.vivance.hotel.service.TboHotelStaticDetailsSyncService;
 import com.vivance.hotel.config.RequestLoggingConfig;
 import com.vivance.hotel.domain.entity.ApiAccessLog;
 import com.vivance.hotel.service.HotelCityService;
@@ -51,6 +53,7 @@ public class HotelController {
     private final HotelSearchV1Service hotelSearchV1Service;
     private final HotelCountryService hotelCountryService;
     private final HotelCityService hotelCityService;
+    private final TboHotelStaticDetailsSyncService tboHotelStaticDetailsSyncService;
 
     /**
      * POST /api/v1/hotels/search
@@ -153,6 +156,24 @@ public class HotelController {
                 request != null ? request.getTraceId() : null);
         TboGetBookingDetailResponse resp = hotelService.getBookingDetailRawTbo(request);
         return ResponseEntity.ok(ApiResponse.success(resp));
+    }
+
+    /**
+     * POST /api/v1/hotels/tbo/static/hoteldetails
+     *
+     * <p>Syncs TBO static {@code Hoteldetails} into {@code tbo_hotel_static_details} for {@code hotel_code} rows
+     * in {@code tbo_hotels_static} that do not yet have {@code fetched_at} set (resume-safe). Optional
+     * {@code hotel.aggregators.tbo.static-hotel-details-restrict-to-city-names} limits by {@code city_name}
+     * (test env). Production leaves that list empty (all cities).
+     * Requires {@code X-API-KEY} and {@code Authorization: Bearer <JWT>}.
+     */
+    @PostMapping("/tbo/static/hoteldetails")
+    @Operation(summary = "Sync TBO static hotel details into DB",
+            description = "Resume-aware sync: pending codes only; optional city_name filter via config; 50 codes/request, 10 parallel; IsRoomDetailRequired=true.")
+    public ResponseEntity<ApiResponse<TboHotelStaticDetailsSyncResult>> tboStaticHotelDetails() {
+
+        TboHotelStaticDetailsSyncResult result = tboHotelStaticDetailsSyncService.syncAllHotelDetailsFromStaticTable();
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 
     /**

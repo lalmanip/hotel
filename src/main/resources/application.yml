@@ -76,6 +76,11 @@ hotel:
       end-user-ip: 123.1.1.1
       affiliate-search-url: https://affiliate.tektravels.com/HotelAPI/Search
       affiliate-pre-book-url: https://affiliate.tektravels.com/HotelAPI/PreBook
+      # TBO static Hoteldetails bulk sync (/api/v1/hotels/tbo/static/hoteldetails)
+      static-hotel-details-batch-size: 50
+      static-hotel-details-max-concurrent-requests: 10
+      # Empty = all cities (production). Non-empty = only these city_name values (case-insensitive), e.g. test env.
+      static-hotel-details-restrict-to-city-names: []
 
   search:
     # Max hotel codes per TBO Search request (TBO typically supports ~100).

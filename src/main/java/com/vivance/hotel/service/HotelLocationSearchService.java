@@ -23,11 +23,8 @@ public class HotelLocationSearchService {
     private final HotelRepository hotelRepository;
     private final TboHotelStaticRepository tboHotelStaticRepository;
 
-    public List<LocationSearchResultDto> searchLocations(String query, Integer limit) {
+    public List<LocationSearchResultDto> searchLocations(String query, Integer limit, Double lat, Double lng) {
         String q = query == null ? "" : query.trim();
-        if (q.length() < 2) {
-            throw new IllegalArgumentException("query must be at least 2 characters");
-        }
 
         int finalLimit = limit == null ? DEFAULT_LIMIT : limit;
         if (finalLimit < 1) {
@@ -46,6 +43,15 @@ public class HotelLocationSearchService {
         Set<String> cityIds = new HashSet<>();
         Set<Long> hotelIds = new HashSet<>();
 
+        // If coordinates are provided, return nearest hotels (optionally filtered by query) and skip cities.
+        if (lat != null && lng != null) {
+            return nearestHotels(q, finalLimit, lat, lng);
+        }
+
+        if (q.length() < 2) {
+            throw new IllegalArgumentException("query must be at least 2 characters");
+        }
+
         // 1) Cities first (prefix then contains)
         addCities(q, finalLimit, out, cityIds);
 
@@ -56,6 +62,41 @@ public class HotelLocationSearchService {
         }
 
         return out;
+    }
+
+    private List<LocationSearchResultDto> nearestHotels(String q, int finalLimit, double lat, double lng) {
+        List<TboHotelStaticRepository.StaticHotelLocationRow> rows =
+                tboHotelStaticRepository.searchNearestStaticHotels(q, lat, lng, finalLimit);
+        List<LocationSearchResultDto> out = new ArrayList<>(Math.min(finalLimit, rows.size()));
+        Set<Long> hotelIds = new HashSet<>();
+
+        for (TboHotelStaticRepository.StaticHotelLocationRow h : rows) {
+            if (out.size() >= finalLimit) break;
+            if (h == null || h.getHotelCode() == null) continue;
+            long key = h.getHotelCode().hashCode();
+            if (!hotelIds.add(key)) continue;
+            out.add(LocationSearchResultDto.builder()
+                    .type("hotel")
+                    .id(h.getHotelCode())
+                    .name(h.getHotelName() != null ? h.getHotelName() : h.getHotelCode())
+                    .secondaryText(formatHotelSecondaryText(h.getCityName(), h.getCountryName()))
+                    .latitude(parseCoord(h.getLatitude()))
+                    .longitude(parseCoord(h.getLongitude()))
+                    .build());
+        }
+        return out;
+    }
+
+    private Double parseCoord(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        if (t.isEmpty()) return null;
+        try {
+            double v = Double.parseDouble(t);
+            return Double.isFinite(v) ? v : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void addCities(String q, int finalLimit, List<LocationSearchResultDto> out, Set<String> cityIds) {
@@ -144,6 +185,8 @@ public class HotelLocationSearchService {
                     .id(h.getHotelCode())
                     .name(h.getHotelName() != null ? h.getHotelName() : h.getHotelCode())
                     .secondaryText(formatHotelSecondaryText(h.getCityName(), h.getCountryName()))
+                    .latitude(parseCoord(h.getLatitude()))
+                    .longitude(parseCoord(h.getLongitude()))
                     .build());
         }
 
@@ -162,6 +205,8 @@ public class HotelLocationSearchService {
                     .id(h.getHotelCode())
                     .name(h.getHotelName() != null ? h.getHotelName() : h.getHotelCode())
                     .secondaryText(formatHotelSecondaryText(h.getCityName(), h.getCountryName()))
+                    .latitude(parseCoord(h.getLatitude()))
+                    .longitude(parseCoord(h.getLongitude()))
                     .build());
         }
     }

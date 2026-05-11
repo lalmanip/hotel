@@ -152,5 +152,44 @@ public class TboStaticDataService {
         existing.setCityCode(cityCode);
         existing.setCityName(h.getCityName());
     }
+
+    /**
+     * TBO static hotel content (description, facilities, images, etc.).
+     * POST {@code {staticBaseUrl}/Hoteldetails} with HTTP Basic (static user/password).
+     */
+    public TboStaticHotelDetailsResponse fetchHotelDetails(TboStaticHotelDetailsRequest request) {
+        if (request.getLanguage() == null || request.getLanguage().isBlank()) {
+            request.setLanguage("EN");
+        }
+        if (request.getIsRoomDetailRequired() == null) {
+            request.setIsRoomDetailRequired(Boolean.TRUE);
+        }
+
+        String url = aggregatorProperties.getTbo().getStaticBaseUrl() + "/Hoteldetails";
+        HttpEntity<TboStaticHotelDetailsRequest> entity = new HttpEntity<>(request, basicAuthHeaders());
+
+        long start = System.nanoTime();
+        ResponseEntity<TboStaticHotelDetailsResponse> response = tboRestTemplate.exchange(
+                url, HttpMethod.POST, entity, TboStaticHotelDetailsResponse.class);
+        long tookMs = (System.nanoTime() - start) / 1_000_000L;
+
+        TboStaticHotelDetailsResponse body = response.getBody();
+        int n = body != null && body.getHotelDetails() != null ? body.getHotelDetails().size() : 0;
+        log.info("[TBO-STATIC] Hoteldetails status={} hotels={} tookMs={}",
+                response.getStatusCode(), n, tookMs);
+        validateHotelDetailsResponse(body, url);
+        return body;
+    }
+
+    private void validateHotelDetailsResponse(TboStaticHotelDetailsResponse body, String url) {
+        if (body == null || body.getStatus() == null) {
+            throw new IllegalStateException("Empty TBO Hoteldetails response from " + url);
+        }
+        Integer code = body.getStatus().getCode();
+        if (code == null || code != 200) {
+            String desc = body.getStatus().getDescription();
+            throw new IllegalStateException("TBO Hoteldetails failed: status=" + code + " " + desc + " (" + url + ")");
+        }
+    }
 }
 

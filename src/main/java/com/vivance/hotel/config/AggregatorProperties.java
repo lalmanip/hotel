@@ -4,6 +4,7 @@ import com.vivance.hotel.domain.enums.AggregatorType;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -54,6 +55,15 @@ public class AggregatorProperties {
         private String staticBaseUrl = "http://api.tbotechnology.in/TBOHolidays_HotelAPI";
         private String staticUserName = "TBOStaticAPITest";
         private String staticPassword = "Tbo@11530818";
+        /** Comma-separated {@code Hotelcodes} per Hoteldetails call (TBO allows up to 50). */
+        private int staticHotelDetailsBatchSize = 50;
+        /** Max concurrent Hoteldetails HTTP calls (TBO allows 10 parallel). */
+        private int staticHotelDetailsMaxConcurrentRequests = 10;
+        /**
+         * When non-empty, only rows in {@code tbo_hotels_static} whose {@code city_name} matches
+         * one of these values (case-insensitive trim) are considered for sync. Empty = all cities (production).
+         */
+        private List<String> staticHotelDetailsRestrictToCityNames = new ArrayList<>();
 
         // ── Affiliate hotel flow URLs (Search -> PreBook) ───────────────────
         private String affiliateSearchUrl = "https://affiliate.tektravels.com/HotelAPI/Search";

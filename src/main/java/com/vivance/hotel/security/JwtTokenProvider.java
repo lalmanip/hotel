@@ -3,6 +3,7 @@ package com.vivance.hotel.security;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
@@ -22,9 +23,18 @@ public class JwtTokenProvider {
     @Value("${jwt.expiration-ms}")
     private long jwtExpirationMs;
 
+    // TEMPORARY — remove after confirming correct secret is loaded
+    @PostConstruct
+    public void logLoadedSecret() {
+        try {
+            byte[] decoded = Decoders.BASE64.decode(jwtSecret);
+            log.warn("[JWT-DEBUG] jwt.secret loaded: value='{}' decodedByteLength={}", jwtSecret, decoded.length);
+        } catch (Exception e) {
+            log.warn("[JWT-DEBUG] jwt.secret loaded: value='{}' (NOT valid base64: {})", jwtSecret, e.getMessage());
+        }
+    }
+
     private SecretKey signingKey() {
-        log.warn("[JWT-DEBUG] jwt.secret value = '{}' (decoded byte length={})",
-                jwtSecret, Decoders.BASE64.decode(jwtSecret).length);
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
         return Keys.hmacShaKeyFor(keyBytes);
     }
